@@ -3,7 +3,7 @@ import { discService, imageService, ReturnStatus, Source, supabaseService } from
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ImageUpload } from './components/ImageUpload';
 import { ReturnStatusManager } from './components/ReturnStatusManager';
-import { ContactAttempts } from './components/ContactAttempts';
+
 import { RakerDiverDashboard } from './components/RakerDiverDashboard';
 import { AdminBulkTurnins } from './components/AdminBulkTurnins';
 import ProfileImportManager from './components/ProfileImportManager';
@@ -11,7 +11,7 @@ import ProfileManager from './components/ProfileManager';
 import PhotoMigrationManager from './components/PhotoMigrationManager';
 import SourceManager from './components/SourceManager';
 import { sendFoundDiscNotification, validatePhoneForSMS } from './lib/smsService';
-import { normalizePhoneNumber } from './utils/phoneUtils';
+
 
 type Page = 'home' | 'report-found' | 'search-lost' | 'login' | 'admin' | 'rakerdiver' | 'admin-bulk-turnins' | 'profile-import' | 'profile' | 'photo-migration';
 
@@ -144,49 +144,7 @@ interface PageProps {
 
 function AdminDashboard({ onNavigate }: PageProps) {
   const { userRole } = useAuth();
-  const [allDiscs, setAllDiscs] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [filter, setFilter] = useState<ReturnStatus | 'All'>('All');
   const [showSourceManager, setShowSourceManager] = useState(false);
-
-  const loadAllDiscs = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await discService.getAdminFoundDiscs();
-      if (error) {
-        console.error('Error loading admin discs:', error);
-      } else {
-        console.log('Admin discs loaded:', data);
-        setAllDiscs(data || []);
-      }
-    } catch (error) {
-      console.error('Error loading admin discs:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  React.useEffect(() => {
-    loadAllDiscs();
-  }, []);
-
-  const handleReturnStatusUpdate = (discId: string, newStatus: ReturnStatus) => {
-    setAllDiscs(prev => prev.map(disc =>
-      disc.id === discId
-        ? { ...disc, return_status: newStatus, returned_at: new Date().toISOString() }
-        : disc
-    ));
-  };
-
-  const filteredDiscs = filter === 'All'
-    ? allDiscs
-    : allDiscs.filter(disc => disc.return_status === filter);
-
-  const statusCounts = allDiscs.reduce((counts, disc) => {
-    const status = disc.return_status || 'Found';
-    counts[status] = (counts[status] || 0) + 1;
-    return counts;
-  }, {} as Record<string, number>);
 
   // Redirect if not admin
   if (userRole !== 'admin') {
@@ -210,155 +168,28 @@ function AdminDashboard({ onNavigate }: PageProps) {
           ← Back to Home
         </button>
         <h1>Admin Dashboard</h1>
-        <p>Manage all found discs and their return status.</p>
+        <p>Administrative tools and management functions.</p>
       </div>
 
       {/* Admin Actions */}
-      <div className="admin-actions">
+      <div className="hero-buttons">
         <button
-          className="button primary"
+          className="hero-button primary"
           onClick={() => onNavigate('admin-bulk-turnins')}
         >
           Manage Bulk Turn-Ins
         </button>
         <button
-          className="button primary"
+          className="hero-button secondary"
           onClick={() => setShowSourceManager(true)}
         >
           Manage Sources
         </button>
       </div>
 
-      {/* Status Summary */}
-      <div className="status-summary">
-        <h3>Status Summary</h3>
-        <div className="status-counts">
-          {Object.entries(statusCounts).map(([status, count]) => (
-            <div key={status} className="status-count">
-              <span className="count">{count as number}</span>
-              <span className="status">{status}</span>
-            </div>
-          ))}
-        </div>
-      </div>
 
-      {/* Filter Controls */}
-      <div className="filter-controls">
-        <label htmlFor="status-filter">Filter by Status:</label>
-        <select
-          id="status-filter"
-          value={filter}
-          onChange={(e) => setFilter(e.target.value as ReturnStatus | 'All')}
-        >
-          <option value="All">All Statuses</option>
-          <option value="Found">Found</option>
-          <option value="Returned to Owner">Returned to Owner</option>
-          <option value="Donated">Donated</option>
-          <option value="Sold">Sold</option>
-          <option value="Trashed">Trashed</option>
-        </select>
-      </div>
 
-      {/* Disc List */}
-      {isLoading ? (
-        <div className="loading-container">
-          <div className="loading-spinner"></div>
-          <p>Loading discs...</p>
-        </div>
-      ) : (
-        <div className="admin-disc-grid">
-          {filteredDiscs.length === 0 ? (
-            <p>No discs found for the selected filter.</p>
-          ) : (
-            filteredDiscs.map((disc) => (
-              <div key={disc.id} className="admin-disc-card">
-                <div className="disc-header">
-                  <h4>{disc.brand} {disc.mold || 'Unknown Mold'}</h4>
-                  <div className="disc-meta">
-                    <span className="disc-type">{disc.disc_type || 'Unknown Type'}</span>
-                    {disc.rack_id && <span className="rack-id">Rack #{disc.rack_id}</span>}
-                  </div>
-                </div>
 
-                <ReturnStatusManager
-                  discId={disc.id}
-                  currentStatus={disc.return_status || 'Found'}
-                  onStatusUpdated={(newStatus) => handleReturnStatusUpdate(disc.id, newStatus)}
-                  disabled={false}
-                />
-
-                {disc.image_urls && disc.image_urls.length > 0 && (
-                  <div className="disc-images">
-                    {disc.image_urls.slice(0, 2).map((imageUrl: string, index: number) => (
-                      <img
-                        key={index}
-                        src={imageUrl}
-                        alt={`${disc.brand} ${disc.mold || 'disc'} ${index + 1}`}
-                        className="disc-image"
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                      />
-                    ))}
-                  </div>
-                )}
-
-                <div className="disc-details">
-                  <div className="detail-row">
-                    <span className="label">Color:</span>
-                    <span className="value">{disc.color}</span>
-                  </div>
-                  {disc.source_name && (
-                    <div className="detail-row">
-                      <span className="label">Source:</span>
-                      <span className="value">{disc.source_name}</span>
-                    </div>
-                  )}
-                  <div className="detail-row">
-                    <span className="label">Specific Location:</span>
-                    <span className="value">{disc.location_found}</span>
-                  </div>
-                  <div className="detail-row">
-                    <span className="label">Found Date:</span>
-                    <span className="value">{new Date(disc.found_date).toLocaleDateString()}</span>
-                  </div>
-                  {disc.returned_at && (
-                    <div className="detail-row">
-                      <span className="label">Returned Date:</span>
-                      <span className="value">{new Date(disc.returned_at).toLocaleDateString()}</span>
-                    </div>
-                  )}
-                  {disc.returned_notes && (
-                    <div className="detail-row">
-                      <span className="label">Notes:</span>
-                      <span className="value">{disc.returned_notes}</span>
-                    </div>
-                  )}
-                  {disc.contact_attempts_count !== undefined && (
-                    <div className="detail-row">
-                      <span className="label">Contact Attempts:</span>
-                      <span className="value">
-                        {disc.contact_attempts_count}
-                        {disc.last_contact_date && (
-                          <span className="text-sm text-gray-500 ml-2">
-                            (Last: {new Date(disc.last_contact_date).toLocaleDateString()})
-                          </span>
-                        )}
-                      </span>
-                    </div>
-                  )}
-                </div>
-
-                {/* Contact Attempts Section */}
-                <ContactAttempts
-                  discId={disc.id}
-                  onContactAdded={() => loadAllDiscs()}
-                />
-              </div>
-            ))
-          )}
-        </div>
-      )}
 
       {/* Source Manager Modal */}
       {showSourceManager && (
@@ -419,22 +250,7 @@ function Home({ onNavigate }: PageProps) {
         </div>
       </div>
 
-      <div className="stats">
-        <div className="stats-grid">
-          <div className="stat-item">
-            <div className="stat-number">500+</div>
-            <div className="stat-label">Discs Reunited</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-number">1,200+</div>
-            <div className="stat-label">Active Users</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-number">95%</div>
-            <div className="stat-label">Success Rate</div>
-          </div>
-        </div>
-      </div>
+
 
       <div className="cta">
         <h2>Join the Community</h2>

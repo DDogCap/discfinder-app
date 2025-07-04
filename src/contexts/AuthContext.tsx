@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase, Profile } from '../lib/supabase';
 
@@ -34,8 +34,30 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [userRole, setUserRole] = useState<UserRole>('guest');
+  const [userRole, setUserRole] = useState<UserRole>(() => {
+    // Try to restore role from localStorage on initial load
+    try {
+      const savedRole = localStorage.getItem('discfinder_user_role');
+      return (savedRole as UserRole) || 'guest';
+    } catch {
+      return 'guest';
+    }
+  });
   const [loading, setLoading] = useState(true);
+
+  // Helper function to update user role and persist to localStorage
+  const updateUserRole = (newRole: UserRole) => {
+    setUserRole(newRole);
+    try {
+      if (newRole === 'guest') {
+        localStorage.removeItem('discfinder_user_role');
+      } else {
+        localStorage.setItem('discfinder_user_role', newRole);
+      }
+    } catch (error) {
+      console.warn('Failed to save user role to localStorage:', error);
+    }
+  };
 
   useEffect(() => {
     // Get initial session with timeout
@@ -46,7 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (error) {
           console.warn('Auth session error:', error);
-          setUserRole('guest');
+          updateUserRole('guest');
           setLoading(false);
           return;
         }
@@ -59,12 +81,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           await fetchProfile(session.user.id);
         } else {
           console.log('No user session, setting as guest');
-          setUserRole('guest');
+          updateUserRole('guest');
           setLoading(false);
         }
       } catch (error) {
         console.warn('Auth initialization failed:', error);
-        setUserRole('guest');
+        updateUserRole('guest');
         setLoading(false);
       }
     };
@@ -72,7 +94,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Set a timeout to prevent infinite loading
     const timeoutId = setTimeout(() => {
       console.warn('Auth initialization timeout, setting as guest');
-      setUserRole('guest');
+      updateUserRole('guest');
       setLoading(false);
     }, 5000); // 5 second timeout
 
@@ -91,7 +113,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await fetchProfile(session.user.id);
       } else {
         setProfile(null);
-        setUserRole('guest');
+        updateUserRole('guest');
         setLoading(false);
       }
     });
@@ -99,9 +121,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => subscription.unsubscribe();
   }, []);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string, retryCount = 0) => {
     try {
-      console.log('Fetching profile for user:', userId);
+      console.log('Fetching profile for user:', userId, retryCount > 0 ? `(retry ${retryCount})` : '');
 
       // Add timeout for profile fetch
       const profilePromise = supabase
@@ -111,7 +133,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Profile fetch timeout')), 3000)
+        setTimeout(() => reject(new Error('Profile fetch timeout')), 5000) // Increased timeout
       );
 
       const { data, error } = await Promise.race([profilePromise, timeoutPromise]) as any;
@@ -169,7 +191,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     .eq('id', importedProfile.id);
 
                   setProfile(createdProfile);
-                  setUserRole(createdProfile.role as UserRole || 'user');
+                  updateUserRole(createdProfile.role as UserRole || 'user');
                   setLoading(false);
                   return;
                 }
@@ -197,7 +219,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               } else {
                 console.log('Profile created successfully');
                 setProfile(createdProfile);
-                setUserRole(createdProfile.role as UserRole || 'user');
+                updateUserRole(createdProfile.role as UserRole || 'user');
                 setLoading(false);
                 return;
               }
@@ -207,24 +229,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
 
-        // If we can't fetch/create profile, continue as authenticated user without profile
-        console.log('Continuing without profile data');
-        setUserRole('user');
+        // If we can't fetch/create profile, preserve existing role if we have one
+        console.log('Continuing without profile data, preserving existing role:', userRole);
+        if (userRole === 'guest') {
+          updateUserRole('user');
+        }
+        // Otherwise keep the existing role to prevent losing admin access
         setLoading(false);
         return;
       }
 
       console.log('Profile fetched successfully:', data);
       setProfile(data);
-      setUserRole(data.role || 'user');
+      updateUserRole(data.role || 'user');
       setLoading(false);
     } catch (error) {
       console.error('Error in fetchProfile:', error);
-      // Don't fail completely, just continue as authenticated user
-      setUserRole('user');
+
+      // Retry on network errors (but not more than 2 times)
+      if (retryCount < 2 && (error as any)?.message?.includes('timeout')) {
+        console.log('Retrying profile fetch due to timeout...');
+        setTimeout(() => fetchProfile(userId, retryCount + 1), 1000 * (retryCount + 1));
+        return;
+      }
+
+      // Don't fail completely, preserve existing role to prevent losing admin access
+      console.log('Preserving existing role due to fetch error:', userRole);
+      if (userRole === 'guest') {
+        updateUserRole('user');
+      }
+      // Otherwise keep the existing role
       setLoading(false);
     }
-  };
+  }, [userRole]);
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
