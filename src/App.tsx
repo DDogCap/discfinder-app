@@ -220,54 +220,6 @@ function Home({ onNavigate }: PageProps) {
         </div>
       </div>
 
-      <div className="features">
-        <div className="feature-card">
-          <div className="feature-icon">
-            <div>🔍</div>
-          </div>
-          <h3>Smart Matching</h3>
-          <p>
-            Our intelligent system matches found and lost discs based on brand, mold, color, and location.
-          </p>
-        </div>
-
-        <div className="feature-card">
-          <div className="feature-icon">
-            <div>📍</div>
-          </div>
-          <h3>Location Based</h3>
-          <p>
-            Find discs near where you lost them with our location-based search and matching.
-          </p>
-        </div>
-
-        <div className="feature-card">
-          <div className="feature-icon">
-            <div>💬</div>
-          </div>
-          <h3>Easy Communication</h3>
-          <p>
-            Connect directly with finders and owners through our secure contact system.
-          </p>
-        </div>
-      </div>
-
-      <div className="stats">
-        <div className="stats-grid">
-          <div className="stat-item">
-            <div className="stat-number">6,400+</div>
-            <div className="stat-label">Discs Found</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-number">140+</div>
-            <div className="stat-label">Active Users</div>
-          </div>
-          <div className="stat-item">
-            <div className="stat-number">95%</div>
-            <div className="stat-label">Success Rate</div>
-          </div>
-        </div>
-      </div>
 
       <div className="cta">
         <h2>Join the Community</h2>
