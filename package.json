@@ -6,6 +6,7 @@
     "@glideapps/tables": "^1.0.21",
     "@supabase/supabase-js": "^2.50.2",
     "axios": "^1.6.0",
+    "date-fns": "^2.30.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.3.0",
