@@ -60,8 +60,8 @@ function AppContent() {
       <div className="app">
         <div className="loading-container">
           <div className="loading-spinner"></div>
-          <p>Loading...</p>
-          <p style={{ fontSize: '0.8rem', color: '#666', marginTop: '1rem' }}>
+          <p className="text-gray-600">Loading...</p>
+          <p className="text-xs text-gray-500 mt-4">
             If this takes too long, check the browser console for errors
           </p>
         </div>
@@ -73,7 +73,7 @@ function AppContent() {
     <div className="app">
       <nav className="navbar">
         <div className="nav-container">
-          <div className="logo" onClick={() => setCurrentPage('home')} style={{ cursor: 'pointer' }}>
+          <div className="logo" onClick={() => setCurrentPage('home')}>
             DiscFinder
           </div>
           <div className="nav-buttons">
@@ -203,18 +203,20 @@ function Home({ onNavigate }: PageProps) {
   return (
     <div>
       <div className="hero">
+        <h1 className="text-4xl lg:text-6xl font-bold text-gray-900 mb-6">
+          Lost Your Disc?
+        </h1>
         <p>
-          The DZDiscFinder helps disc golf players reunite with their lost discs, report found discs, orsearch for your lost discs in our database.
+          The DZDiscFinder helps disc golf players reunite with their lost discs, report found discs, or search for your lost discs in our database.
         </p>
 
         <div className="hero-buttons">
           <button className="hero-button secondary" onClick={() => onNavigate('search-lost')}>
-            Search
+            Search Found Discs
           </button>
           <button className="hero-button primary" onClick={() => onNavigate('report-found')}>
-            Found
+            Report Found Disc
           </button>
-
         </div>
       </div>
 
@@ -225,7 +227,7 @@ function Home({ onNavigate }: PageProps) {
           </div>
           <h3>Smart Matching</h3>
           <p>
-            Our intelligent system matches found and lost discs based on brand, model, color, and location.
+            Our intelligent system matches found and lost discs based on brand, mold, color, and location.
           </p>
         </div>
 
@@ -245,12 +247,27 @@ function Home({ onNavigate }: PageProps) {
           </div>
           <h3>Easy Communication</h3>
           <p>
-            Connect directly with finders and owners through our secure messaging system.
+            Connect directly with finders and owners through our secure contact system.
           </p>
         </div>
       </div>
 
-
+      <div className="stats">
+        <div className="stats-grid">
+          <div className="stat-item">
+            <div className="stat-number">6,400+</div>
+            <div className="stat-label">Discs Found</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-number">140+</div>
+            <div className="stat-label">Active Users</div>
+          </div>
+          <div className="stat-item">
+            <div className="stat-number">95%</div>
+            <div className="stat-label">Success Rate</div>
+          </div>
+        </div>
+      </div>
 
       <div className="cta">
         <h2>Join the Community</h2>
