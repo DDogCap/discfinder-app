@@ -1,0 +1,13 @@
+{
+  "totalDiscs": 0,
+  "processedDiscs": 5399,
+  "successfulDiscs": 5399,
+  "failedDiscs": 0,
+  "totalImages": 0,
+  "migratedImages": 5389,
+  "failedImages": 14,
+  "errors": [],
+  "startTime": "2025-07-01T19:30:46.581Z",
+  "currentOffset": 6400,
+  "endTime": "2025-07-01T22:58:17.333Z"
+}

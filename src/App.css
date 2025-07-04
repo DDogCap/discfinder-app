@@ -1,0 +1,510 @@
+.App {
+  text-align: center;
+}
+
+.App-logo {
+  height: 40vmin;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .App-logo {
+    animation: App-logo-spin infinite 20s linear;
+  }
+}
+
+.App-header {
+  background-color: #282c34;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: calc(10px + 2vmin);
+  color: white;
+}
+
+.App-link {
+  color: #61dafb;
+}
+
+@keyframes App-logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* RakerDiver Dashboard Styles - Mobile First */
+.dashboard-actions {
+  margin-bottom: 1.5rem; /* Reduced for mobile */
+}
+
+.dashboard-actions .button {
+  margin-right: 0.5rem; /* Reduced for mobile */
+  margin-bottom: 0.5rem; /* Added for mobile stacking */
+}
+
+.turnin-grid {
+  display: grid;
+  grid-template-columns: 1fr; /* Single column on mobile */
+  gap: 1rem; /* Reduced for mobile */
+  margin-top: 1rem;
+}
+
+.turnin-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1rem; /* Reduced for mobile */
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  transition: box-shadow 0.2s;
+}
+
+.turnin-card:hover {
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+}
+
+.turnin-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.turnin-header h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: capitalize;
+}
+
+.status-badge.verified {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.status-badge.pending {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.turnin-details {
+  margin-bottom: 1.5rem;
+}
+
+.turnin-details p {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.turnin-details strong {
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.payment-summary {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+/* Admin Bulk Turn-ins Styles */
+.admin-actions {
+  margin-bottom: 2rem;
+}
+
+.admin-turnin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.admin-turnin-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.turnin-actions {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.verification-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: #f9fafb;
+  border-radius: 0.375rem;
+  border: 1px solid #e5e7eb;
+}
+
+.verification-section textarea {
+  resize: vertical;
+  min-height: 80px;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  font-size: 0.875rem;
+}
+
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 0.5rem;
+  padding: 2rem;
+  max-width: 600px;
+  width: 100%;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.modal-content.large-modal {
+  max-width: 800px;
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.modal-header h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.close-button {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #6b7280;
+  padding: 0.25rem;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  transition: all 0.2s;
+}
+
+.close-button:hover {
+  color: #374151;
+  background: #f3f4f6;
+}
+
+.modal-body {
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+/* Payment Styles */
+.payment-form {
+  background: #f9fafb;
+  padding: 1.5rem;
+  border-radius: 0.5rem;
+  margin-bottom: 2rem;
+  border: 1px solid #e5e7eb;
+}
+
+.payment-form h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin-top: 0;
+  margin-bottom: 1rem;
+}
+
+.payments-section h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 1rem;
+}
+
+.payments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.payment-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 1rem;
+  background: white;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+}
+
+.payment-details {
+  flex: 1;
+}
+
+.payment-details p {
+  margin: 0.25rem 0;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.payment-details strong {
+  font-weight: 500;
+  color: #6b7280;
+}
+
+.payment-actions,
+.payment-status {
+  margin-left: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.filter-select {
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 0.375rem;
+  background: white;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+/* Button Aliases for Consistency */
+.primary-button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  font-size: 0.875rem;
+  background: #2563eb;
+  color: white;
+}
+
+.primary-button:hover {
+  background: #1d4ed8;
+}
+
+.primary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.secondary-button {
+  padding: 0.75rem 1.5rem;
+  border-radius: 0.375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 0.875rem;
+  background: white;
+  color: #374151;
+  border: 1px solid #d1d5db;
+}
+
+.secondary-button:hover {
+  background: #f9fafb;
+}
+
+.secondary-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Desktop enhancements for RakerDiver components */
+@media (min-width: 769px) {
+  .dashboard-actions {
+    margin-bottom: 2rem; /* More spacing on desktop */
+  }
+
+  .dashboard-actions .button {
+    margin-right: 1rem; /* More spacing on desktop */
+    margin-bottom: 0; /* Remove mobile stacking */
+  }
+
+  .turnin-grid,
+  .admin-turnin-grid {
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); /* Multi-column on desktop */
+    gap: 1.5rem; /* More spacing on desktop */
+  }
+
+  .turnin-card {
+    padding: 1.5rem; /* More padding on desktop */
+  }
+
+  .verification-section {
+    padding: 1rem; /* More padding on desktop */
+  }
+
+  .modal-content {
+    margin: 2rem; /* More margin on desktop */
+    padding: 2rem; /* More padding on desktop */
+  }
+}
+
+/* Mobile specific adjustments for RakerDiver components */
+@media (max-width: 768px) {
+  .dashboard-actions {
+    text-align: center;
+  }
+
+  .dashboard-actions .button {
+    width: 100%;
+    margin-right: 0;
+  }
+
+  .turnin-actions {
+    gap: 0.5rem;
+  }
+
+  .verification-section {
+    padding: 0.75rem;
+  }
+
+  .modal-content {
+    margin: 1rem;
+    padding: 1.5rem;
+    max-height: 95vh;
+  }
+
+  .modal-content.large-modal {
+    max-width: none;
+  }
+
+  .payment-item {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .payment-actions,
+  .payment-status {
+    margin-left: 0;
+    align-items: flex-start;
+  }
+
+  .filter-controls {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+}
+
+/* Source Management Styles */
+.form-select {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: white;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.form-help {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: #666;
+}
+
+.admin-actions {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.admin-actions .button {
+  margin: 0;
+}
+
+/* Source Manager Specific Styles */
+.large-modal {
+  max-width: 90vw;
+  width: 1200px;
+  max-height: 90vh;
+}
+
+.large-modal .modal-body {
+  max-height: calc(90vh - 120px);
+  overflow-y: auto;
+}
+
+.button.small {
+  padding: 0.25rem 0.75rem;
+  font-size: 0.875rem;
+}
+
+.turnin-actions {
+  margin-top: 1rem;
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.turnin-actions .button {
+  margin: 0;
+}
+
+.status-badge.verified {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-badge.pending {
+  background-color: #f8d7da;
+  color: #721c24;
+}
