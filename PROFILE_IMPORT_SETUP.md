@@ -1,6 +1,6 @@
 # Profile Import Setup Guide
 
-This guide walks you through importing user profiles from your previous Glide app into the DiscFinder application.
+This guide walks you through importing user profiles from your previous Glide app into the DZDiscFinder application.
 
 ## Overview
 
@@ -86,7 +86,7 @@ npm run import-profiles
 
 ### Data Mapping
 
-The import process maps Glide fields to DiscFinder profile fields:
+The import process maps Glide fields to DZDiscFinder profile fields:
 
 | Glide Field | DiscFinder Field | Notes |
 |-------------|------------------|-------|

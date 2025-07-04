@@ -1,7 +1,7 @@
 /**
  * Glide Profile Import Script
  * 
- * This script imports profiles from your Glide app into the DiscFinder Supabase database.
+ * This script imports profiles from your Glide app into the DZDiscFinder Supabase database.
  * 
  * Prerequisites:
  * 1. Install @glideapps/tables: npm install @glideapps/tables

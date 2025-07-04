@@ -1,7 +1,7 @@
 /**
  * Found Disc Import Script
  * 
- * This script imports found discs from the legacy Glide app CSV into the DiscFinder Supabase database.
+ * This script imports found discs from the legacy Glide app CSV into the DZDiscFinder Supabase database.
  * 
  * Prerequisites:
  * 1. Install @supabase/supabase-js: npm install @supabase/supabase-js

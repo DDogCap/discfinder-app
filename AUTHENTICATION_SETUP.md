@@ -2,7 +2,7 @@
 
 ## 🔐 Role-Based Authentication System
 
-Your DiscFinder app now has a complete authentication system with three user levels:
+Your DZDiscFinder app now has a complete authentication system with three user levels:
 
 - **👤 Guests** - Can search discs but see limited information
 - **🔑 Users** - Can report found discs and see full details  

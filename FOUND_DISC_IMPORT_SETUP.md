@@ -1,6 +1,6 @@
 # Found Disc Import Setup Guide
 
-This guide walks you through importing found discs from your legacy Glide app into the DiscFinder application.
+This guide walks you through importing found discs from your legacy Glide app into the DZDiscFinder application.
 
 ## Overview
 

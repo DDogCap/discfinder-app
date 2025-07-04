@@ -74,7 +74,7 @@ function AppContent() {
       <nav className="navbar">
         <div className="nav-container">
           <div className="logo" onClick={() => setCurrentPage('home')}>
-            DiscFinder
+            DZDiscFinder
           </div>
           <div className="nav-buttons">
             <button className="nav-button" onClick={() => setCurrentPage('report-found')}>
@@ -220,16 +220,6 @@ function Home({ onNavigate }: PageProps) {
         </div>
       </div>
 
-
-      <div className="cta">
-        <h2>Join the Community</h2>
-        <p>
-          Create an account to report found discs, search for lost ones, and help fellow disc golfers.
-        </p>
-        <button className="cta-button" onClick={() => onNavigate('login')}>
-          Sign Up Now
-        </button>
-      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "DZDiscFinder",
+  "name": "DZDiscFinder - Disc Golf Lost and Found",
   "icons": [
     {
       "src": "favicon.ico",

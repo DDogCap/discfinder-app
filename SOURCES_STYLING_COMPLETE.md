@@ -1,7 +1,7 @@
 # Sources System - Styling Complete ✅
 
 ## Overview
-The SourceManager component has been successfully restyled to match the consistent DiscFinder app design patterns.
+The SourceManager component has been successfully restyled to match the consistent DZDiscFinder app design patterns.
 
 ## Changes Made
 

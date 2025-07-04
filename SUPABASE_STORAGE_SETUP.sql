@@ -1,4 +1,4 @@
--- Supabase Storage Setup for DiscFinder Images
+-- Supabase Storage Setup for DZDiscFinder Images
 -- Run this in your Supabase SQL Editor after setting up the main database schema
 
 -- Step 1: Create storage bucket for disc images

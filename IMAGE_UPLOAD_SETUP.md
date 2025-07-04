@@ -1,6 +1,6 @@
-# Image Upload Setup for DiscFinder
+# Image Upload Setup for DZDiscFinder
 
-This guide explains how to set up and use the image upload functionality in your DiscFinder app.
+This guide explains how to set up and use the image upload functionality in your DZDiscFinder app.
 
 ## Overview
 

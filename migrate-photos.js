@@ -302,7 +302,7 @@ async function validateSetup(config) {
 async function main() {
   const migrationType = process.argv[2] || 'profiles';
   
-  console.log('📸 DiscFinder Photo Migration Tool');
+  console.log('📸 DZDiscFinder Photo Migration Tool');
   console.log('==================================\n');
   
   if (!MIGRATION_CONFIGS[migrationType]) {

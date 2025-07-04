@@ -52,7 +52,7 @@ async function downloadImage(url) {
       timeout: DOWNLOAD_TIMEOUT,
       maxContentLength: MAX_FILE_SIZE,
       headers: {
-        'User-Agent': 'DiscFinder-ImageMigration/1.0'
+        'User-Agent': 'DZDiscFinder-ImageMigration/1.0'
       }
     });
 

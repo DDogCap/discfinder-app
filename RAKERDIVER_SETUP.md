@@ -1,6 +1,6 @@
 # RakerDiver Role Setup Guide
 
-This guide explains how to set up and use the new RakerDiver role and bulk turn-in functionality in the DiscFinder app.
+This guide explains how to set up and use the new RakerDiver role and bulk turn-in functionality in the DZDiscFinder app.
 
 ## 🎯 What is a RakerDiver?
 

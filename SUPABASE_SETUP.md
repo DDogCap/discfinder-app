@@ -1,4 +1,4 @@
-# Supabase Setup Guide for DiscFinder
+# Supabase Setup Guide for DZDiscFinder
 
 ## Quick Setup (5 minutes)
 
@@ -7,7 +7,7 @@
 2. Click "Start your project" and sign up/login
 3. Click "New Project"
 4. Choose your organization
-5. Enter project name: `discfinder`
+5. Enter project name: `dzdiscfinder`
 6. Enter a strong database password
 7. Choose a region close to you
 8. Click "Create new project"
