@@ -18,7 +18,6 @@
   .return-status-manager {
     @apply relative bg-white border border-gray-200 rounded-2xl shadow-lg p-4 mb-4 z-10;
   }
-}
 
   .status-form {
     @apply flex flex-col gap-4;
