@@ -571,59 +571,99 @@ export const discService = {
     }
   },
 
-  // Single-term search with pagination
+  // Single-term search with pagination - optimized for rack_id searches
   async searchFoundDiscsSingleTermPage(term: string, limit: number, offset: number) {
     try {
       const lowerTerm = term.toLowerCase();
-
-      // Check if term is a number for rack_id search
       const rackIdNum = parseInt(term);
-      const isNumeric = !isNaN(rackIdNum);
+      const isNumericSearch = !isNaN(rackIdNum);
 
-      // Try the public view first, fallback to main table
-      let query = supabase
-        .from('public_found_discs')
-        .select('*', { count: 'exact' });
+      // If it's a numeric search (likely rack_id), try direct rack_id query first
+      if (isNumericSearch) {
+        console.log(`Searching for rack_id: ${rackIdNum}`);
 
-      // Build OR conditions for text search
-      if (isNumeric) {
-        query = query.or(`brand.ilike.%${lowerTerm}%,mold.ilike.%${lowerTerm}%,color.ilike.%${lowerTerm}%,location_found.ilike.%${lowerTerm}%,description.ilike.%${lowerTerm}%,stamp_text.ilike.%${lowerTerm}%,phone_number.ilike.%${lowerTerm}%,name_on_disc.ilike.%${lowerTerm}%,plastic_type.ilike.%${lowerTerm}%,disc_type.ilike.%${lowerTerm}%,rack_id.eq.${rackIdNum}`);
-      } else {
-        query = query.or(`brand.ilike.%${lowerTerm}%,mold.ilike.%${lowerTerm}%,color.ilike.%${lowerTerm}%,location_found.ilike.%${lowerTerm}%,description.ilike.%${lowerTerm}%,stamp_text.ilike.%${lowerTerm}%,phone_number.ilike.%${lowerTerm}%,name_on_disc.ilike.%${lowerTerm}%,plastic_type.ilike.%${lowerTerm}%,disc_type.ilike.%${lowerTerm}%`);
-      }
+        // Try direct rack_id search first
+        let { data: rackIdResults, error: rackIdError } = await supabase
+          .from('public_found_discs')
+          .select('*')
+          .eq('rack_id', rackIdNum);
 
-      let { data, error, count } = await query
-        .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1);
+        // If public view doesn't work, try main table
+        if (rackIdError || !rackIdResults) {
+          console.log('Trying main table for rack_id search');
+          const result = await supabase
+            .from('found_discs')
+            .select('*')
+            .eq('status', 'active')
+            .eq('rack_id', rackIdNum);
 
-      // If public view doesn't exist or doesn't have image_urls, use main table
-      if (error || (data && data.length > 0 && !data[0].hasOwnProperty('image_urls'))) {
-        console.log('Using main table for single term search instead of view');
-        let mainQuery = supabase
-          .from('found_discs')
-          .select('*', { count: 'exact' })
-          .eq('status', 'active');
-
-        if (isNumeric) {
-          mainQuery = mainQuery.or(`brand.ilike.%${lowerTerm}%,mold.ilike.%${lowerTerm}%,color.ilike.%${lowerTerm}%,location_found.ilike.%${lowerTerm}%,description.ilike.%${lowerTerm}%,stamp_text.ilike.%${lowerTerm}%,phone_number.ilike.%${lowerTerm}%,name_on_disc.ilike.%${lowerTerm}%,plastic_type.ilike.%${lowerTerm}%,disc_type.ilike.%${lowerTerm}%,rack_id.eq.${rackIdNum}`);
-        } else {
-          mainQuery = mainQuery.or(`brand.ilike.%${lowerTerm}%,mold.ilike.%${lowerTerm}%,color.ilike.%${lowerTerm}%,location_found.ilike.%${lowerTerm}%,description.ilike.%${lowerTerm}%,stamp_text.ilike.%${lowerTerm}%,phone_number.ilike.%${lowerTerm}%,name_on_disc.ilike.%${lowerTerm}%,plastic_type.ilike.%${lowerTerm}%,disc_type.ilike.%${lowerTerm}%`);
+          rackIdResults = result.data;
+          rackIdError = result.error;
         }
 
-        const result = await mainQuery
-          .order('created_at', { ascending: false })
-          .range(offset, offset + limit - 1);
-        data = result.data;
-        error = result.error;
-        count = result.count;
+        if (rackIdError) {
+          console.error('Rack ID search error:', rackIdError);
+        } else if (rackIdResults && rackIdResults.length > 0) {
+          console.log(`Found ${rackIdResults.length} discs with rack_id ${rackIdNum}`);
+          // For exact rack_id matches, return immediately
+          return {
+            data: rackIdResults,
+            error: null,
+            count: rackIdResults.length,
+            hasMore: false,
+            nextOffset: 0
+          };
+        }
       }
 
-      if (error) throw error;
+      // If no exact rack_id match or it's a text search, fall back to full search
+      console.log(`Performing full search for term: "${term}"`);
+
+      // Get all discs and filter client-side for comprehensive search
+      const { data: allDiscs, error: fetchError } = await this.getAllFoundDiscsChunked();
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      if (!allDiscs || allDiscs.length === 0) {
+        return { data: [], error: null, count: 0, hasMore: false, nextOffset: 0 };
+      }
+
+      // Filter discs that match the search term
+      const filteredDiscs = allDiscs.filter(disc => {
+        const textFields = [
+          disc.brand,
+          disc.mold,
+          disc.color,
+          disc.location_found,
+          disc.description,
+          disc.stamp_text,
+          disc.phone_number,
+          disc.name_on_disc,
+          disc.plastic_type,
+          disc.disc_type
+        ];
+
+        const matchesText = textFields.some(field =>
+          field && field.toLowerCase().includes(lowerTerm)
+        );
+
+        const matchesRackId = isNumericSearch && disc.rack_id === rackIdNum;
+
+        return matchesText || matchesRackId;
+      });
+
+      console.log(`Full search found ${filteredDiscs.length} matching discs`);
+
+      // Apply pagination to filtered results
+      const paginatedResults = filteredDiscs.slice(offset, offset + limit);
+
       return {
-        data,
+        data: paginatedResults,
         error: null,
-        count,
-        hasMore: data && data.length === limit,
+        count: filteredDiscs.length,
+        hasMore: offset + limit < filteredDiscs.length,
         nextOffset: offset + limit
       };
     } catch (error) {
@@ -632,39 +672,96 @@ export const discService = {
     }
   },
 
-  // Single-term search using chunked fetching
+  // Single-term search using chunked fetching - optimized for rack_id searches
   async searchFoundDiscsSingleTermChunked(term: string) {
     try {
-      const allDiscs: FoundDisc[] = [];
-      let offset = 0;
-      const chunkSize = 1000;
-      let hasMore = true;
+      const lowerTerm = term.toLowerCase();
+      const rackIdNum = parseInt(term);
+      const isNumericSearch = !isNaN(rackIdNum);
 
       console.log(`Searching for single term "${term}" using chunked approach...`);
 
-      while (hasMore) {
-        console.log(`Searching chunk at offset ${offset}...`);
+      // If it's a numeric search (likely rack_id), try direct rack_id query first
+      if (isNumericSearch) {
+        console.log(`Trying direct rack_id search for: ${rackIdNum}`);
 
-        const result = await this.searchFoundDiscsSingleTermPage(term, chunkSize, offset);
+        // Try direct rack_id search first
+        let { data: rackIdResults, error: rackIdError } = await supabase
+          .from('public_found_discs')
+          .select('*')
+          .eq('rack_id', rackIdNum);
 
-        if (result.error) throw result.error;
+        // If public view doesn't work, try main table
+        if (rackIdError || !rackIdResults) {
+          console.log('Trying main table for rack_id search');
+          const result = await supabase
+            .from('found_discs')
+            .select('*')
+            .eq('status', 'active')
+            .eq('rack_id', rackIdNum);
 
-        if (result.data && result.data.length > 0) {
-          allDiscs.push(...result.data);
-          console.log(`Found ${result.data.length} discs, total so far: ${allDiscs.length}`);
+          rackIdResults = result.data;
+          rackIdError = result.error;
+        }
 
-          hasMore = result.data.length === chunkSize;
-          offset += chunkSize;
-        } else {
-          hasMore = false;
+        if (rackIdError) {
+          console.error('Rack ID search error:', rackIdError);
+        } else if (rackIdResults && rackIdResults.length > 0) {
+          console.log(`Found ${rackIdResults.length} discs with rack_id ${rackIdNum}`);
+          // For exact rack_id matches, return immediately
+          return {
+            data: rackIdResults,
+            error: null,
+            count: rackIdResults.length,
+            hasMore: false,
+            nextOffset: 0
+          };
         }
       }
 
-      console.log(`Completed chunked single-term search: ${allDiscs.length} total matching discs`);
+      // If no exact rack_id match or it's a text search, fall back to full search
+      console.log(`Performing full chunked search for term: "${term}"`);
+
+      // Get all discs first, then filter in JavaScript for reliable search
+      const { data: allDiscs, error: fetchError } = await this.getAllFoundDiscsChunked();
+
+      if (fetchError) {
+        throw fetchError;
+      }
+
+      if (!allDiscs || allDiscs.length === 0) {
+        return { data: [], error: null, count: 0, hasMore: false, nextOffset: 0 };
+      }
+
+      // Filter discs that match the search term
+      const filteredDiscs = allDiscs.filter(disc => {
+        const textFields = [
+          disc.brand,
+          disc.mold,
+          disc.color,
+          disc.location_found,
+          disc.description,
+          disc.stamp_text,
+          disc.phone_number,
+          disc.name_on_disc,
+          disc.plastic_type,
+          disc.disc_type
+        ];
+
+        const matchesText = textFields.some(field =>
+          field && field.toLowerCase().includes(lowerTerm)
+        );
+
+        const matchesRackId = isNumericSearch && disc.rack_id === rackIdNum;
+
+        return matchesText || matchesRackId;
+      });
+
+      console.log(`Completed single-term search: ${filteredDiscs.length} matching discs out of ${allDiscs.length} total`);
       return {
-        data: allDiscs,
+        data: filteredDiscs,
         error: null,
-        count: allDiscs.length,
+        count: filteredDiscs.length,
         hasMore: false,
         nextOffset: 0
       };
