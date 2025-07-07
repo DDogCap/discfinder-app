@@ -281,8 +281,61 @@
     @apply mt-6;
   }
 
+  .search-results-header {
+    @apply mb-6;
+  }
+
   .search-results h3 {
     @apply text-lg lg:text-xl font-semibold text-gray-900 mb-4;
+  }
+
+  .search-options {
+    @apply flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between bg-gray-50 p-4 rounded-lg;
+  }
+
+  .pagination-options {
+    @apply flex flex-col sm:flex-row gap-3 items-start sm:items-center;
+  }
+
+  .pagination-options label {
+    @apply flex items-center gap-2 text-sm text-gray-700 cursor-pointer;
+  }
+
+  .pagination-options input[type="checkbox"] {
+    @apply w-4 h-4;
+  }
+
+  .pagination-options select {
+    @apply px-3 py-1 border border-gray-300 rounded text-sm;
+  }
+
+  .results-info {
+    @apply text-sm text-gray-600;
+  }
+
+  /* Pagination Controls */
+  .pagination-controls {
+    @apply flex items-center justify-center gap-2 mt-6 pt-6 border-t border-gray-200;
+  }
+
+  .page-numbers {
+    @apply flex items-center gap-1;
+  }
+
+  .page-button {
+    @apply px-3 py-2 text-sm border border-gray-300 bg-white text-gray-700 rounded cursor-pointer transition-colors duration-200 hover:bg-gray-50;
+  }
+
+  .page-button.active {
+    @apply bg-blue-600 text-white border-blue-600 hover:bg-blue-700;
+  }
+
+  .page-button:disabled {
+    @apply opacity-50 cursor-not-allowed hover:bg-white;
+  }
+
+  .page-ellipsis {
+    @apply px-2 py-2 text-sm text-gray-500;
   }
 
   .disc-grid {

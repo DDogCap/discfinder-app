@@ -737,6 +737,13 @@ function SearchLost({ onNavigate }: PageProps) {
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [resultsPerPage, setResultsPerPage] = useState(50);
+  const [showAllResults, setShowAllResults] = useState(false);
+
   const handleReturnStatusUpdate = (discId: string, newStatus: ReturnStatus) => {
     // Update the disc in the local state
     setFoundDiscs(prev => prev.map(disc =>
@@ -750,48 +757,104 @@ function SearchLost({ onNavigate }: PageProps) {
     setSearchQuery(e.target.value);
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSearch = async (e: React.FormEvent, page: number = 1) => {
+    if (e) e.preventDefault();
     setIsSearching(true);
     setHasSearched(true);
+    setCurrentPage(page);
 
     try {
-      const { data, error } = await discService.searchFoundDiscsWithQuery(searchQuery);
+      const offset = (page - 1) * resultsPerPage;
+      const options = showAllResults
+        ? { fetchAll: true }
+        : { limit: resultsPerPage, offset, fetchAll: false };
 
-      if (error) {
-        console.error('Search error:', error);
+      const result = await discService.searchFoundDiscsWithQuery(searchQuery, options);
+
+      if (result.error) {
+        console.error('Search error:', result.error);
         setFoundDiscs([]);
+        setTotalCount(0);
+        setHasMore(false);
       } else {
-        console.log('Search results:', data);
-        setFoundDiscs(data || []);
+        console.log('Search results:', result.data);
+        setFoundDiscs(result.data || []);
+
+        if (showAllResults) {
+          setTotalCount(result.data?.length || 0);
+          setHasMore(false);
+        } else {
+          setTotalCount('count' in result ? result.count || 0 : 0);
+          setHasMore('hasMore' in result ? result.hasMore || false : false);
+        }
       }
     } catch (error) {
       console.error('Search failed:', error);
       setFoundDiscs([]);
+      setTotalCount(0);
+      setHasMore(false);
     } finally {
       setIsSearching(false);
     }
   };
 
-  const loadAllDiscs = async () => {
+  const loadAllDiscs = async (page: number = 1) => {
     setIsSearching(true);
     setHasSearched(true);
+    setCurrentPage(page);
+    setSearchQuery(''); // Clear search query when loading all
 
     try {
-      const { data, error } = await discService.getFoundDiscs();
+      const offset = (page - 1) * resultsPerPage;
+      const options = showAllResults
+        ? { fetchAll: true }
+        : { limit: resultsPerPage, offset, fetchAll: false };
 
-      if (error) {
-        console.error('Load error:', error);
+      const result = await discService.getFoundDiscs(options);
+
+      if (result.error) {
+        console.error('Load error:', result.error);
         setFoundDiscs([]);
+        setTotalCount(0);
+        setHasMore(false);
       } else {
-        console.log('Load all results:', data);
-        setFoundDiscs(data || []);
+        console.log('Load all results:', result.data);
+        setFoundDiscs(result.data || []);
+
+        if (showAllResults) {
+          setTotalCount(result.data?.length || 0);
+          setHasMore(false);
+        } else {
+          setTotalCount('count' in result ? result.count || 0 : 0);
+          setHasMore('hasMore' in result ? result.hasMore || false : false);
+        }
       }
     } catch (error) {
       console.error('Load failed:', error);
       setFoundDiscs([]);
+      setTotalCount(0);
+      setHasMore(false);
     } finally {
       setIsSearching(false);
+    }
+  };
+
+  const handlePageChange = (newPage: number) => {
+    if (searchQuery.trim()) {
+      handleSearch(null as any, newPage);
+    } else {
+      loadAllDiscs(newPage);
+    }
+  };
+
+  const toggleShowAllResults = () => {
+    setShowAllResults(!showAllResults);
+    setCurrentPage(1);
+    // Re-run the current search/load with new setting
+    if (searchQuery.trim()) {
+      handleSearch(null as any, 1);
+    } else if (hasSearched) {
+      loadAllDiscs(1);
     }
   };
 
@@ -830,7 +893,7 @@ function SearchLost({ onNavigate }: PageProps) {
             <button
               type="button"
               className="button secondary"
-              onClick={loadAllDiscs}
+              onClick={() => loadAllDiscs()}
               disabled={isSearching}
             >
               {isSearching ? 'Loading...' : 'Show All Found Discs'}
@@ -847,12 +910,58 @@ function SearchLost({ onNavigate }: PageProps) {
 
         {hasSearched && (
           <div className="search-results">
-            <h3>
-              {foundDiscs.length > 0
-                ? `Found ${foundDiscs.length} disc${foundDiscs.length === 1 ? '' : 's'}`
-                : 'No discs found matching your criteria'
-              }
-            </h3>
+            <div className="search-results-header">
+              <h3>
+                {foundDiscs.length > 0
+                  ? showAllResults
+                    ? `Found ${foundDiscs.length} disc${foundDiscs.length === 1 ? '' : 's'} (showing all)`
+                    : `Found ${foundDiscs.length} disc${foundDiscs.length === 1 ? '' : 's'} (page ${currentPage}${totalCount > 0 ? ` of ${Math.ceil(totalCount / resultsPerPage)}` : ''})`
+                  : 'No discs found matching your criteria'
+                }
+              </h3>
+
+              {foundDiscs.length > 0 && (
+                <div className="search-options">
+                  <div className="pagination-options">
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={showAllResults}
+                        onChange={toggleShowAllResults}
+                        disabled={isSearching}
+                      />
+                      Show all results (may be slow for large datasets)
+                    </label>
+
+                    {!showAllResults && (
+                      <select
+                        value={resultsPerPage}
+                        onChange={(e) => {
+                          setResultsPerPage(Number(e.target.value));
+                          setCurrentPage(1);
+                          if (searchQuery.trim()) {
+                            handleSearch(null as any, 1);
+                          } else {
+                            loadAllDiscs(1);
+                          }
+                        }}
+                        disabled={isSearching}
+                      >
+                        <option value={25}>25 per page</option>
+                        <option value={50}>50 per page</option>
+                        <option value={100}>100 per page</option>
+                      </select>
+                    )}
+                  </div>
+
+                  {totalCount > 0 && !showAllResults && (
+                    <div className="results-info">
+                      Showing {((currentPage - 1) * resultsPerPage) + 1}-{Math.min(currentPage * resultsPerPage, totalCount)} of {totalCount} total results
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
 
             {foundDiscs.length > 0 && (
               <div className="disc-grid">
@@ -962,6 +1071,93 @@ function SearchLost({ onNavigate }: PageProps) {
                 ))}
               </div>
             )}
+
+            {/* Pagination Controls */}
+            {foundDiscs.length > 0 && !showAllResults && totalCount > resultsPerPage && (
+                <div className="pagination-controls">
+                  <button
+                    className="button secondary"
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage <= 1 || isSearching}
+                  >
+                    ← Previous
+                  </button>
+
+                  <div className="page-numbers">
+                    {(() => {
+                      const totalPages = Math.ceil(totalCount / resultsPerPage);
+                      const pages = [];
+                      const maxVisiblePages = 5;
+
+                      let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                      let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+                      // Adjust start if we're near the end
+                      if (endPage - startPage + 1 < maxVisiblePages) {
+                        startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                      }
+
+                      // Add first page and ellipsis if needed
+                      if (startPage > 1) {
+                        pages.push(
+                          <button
+                            key={1}
+                            className={`page-button ${1 === currentPage ? 'active' : ''}`}
+                            onClick={() => handlePageChange(1)}
+                            disabled={isSearching}
+                          >
+                            1
+                          </button>
+                        );
+                        if (startPage > 2) {
+                          pages.push(<span key="ellipsis1" className="page-ellipsis">...</span>);
+                        }
+                      }
+
+                      // Add visible page numbers
+                      for (let i = startPage; i <= endPage; i++) {
+                        pages.push(
+                          <button
+                            key={i}
+                            className={`page-button ${i === currentPage ? 'active' : ''}`}
+                            onClick={() => handlePageChange(i)}
+                            disabled={isSearching}
+                          >
+                            {i}
+                          </button>
+                        );
+                      }
+
+                      // Add last page and ellipsis if needed
+                      if (endPage < totalPages) {
+                        if (endPage < totalPages - 1) {
+                          pages.push(<span key="ellipsis2" className="page-ellipsis">...</span>);
+                        }
+                        pages.push(
+                          <button
+                            key={totalPages}
+                            className={`page-button ${totalPages === currentPage ? 'active' : ''}`}
+                            onClick={() => handlePageChange(totalPages)}
+                            disabled={isSearching}
+                          >
+                            {totalPages}
+                          </button>
+                        );
+                      }
+
+                      return pages;
+                    })()}
+                  </div>
+
+                  <button
+                    className="button secondary"
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={!hasMore || isSearching}
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
           </div>
         )}
       </div>
