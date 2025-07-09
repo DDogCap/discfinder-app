@@ -779,31 +779,33 @@ function ReportFound({ onNavigate }: PageProps) {
 
 
 
-        {/* Final Form Actions */}
-        <div className="form-actions final-actions">
-          <button
-            type="button"
-            className="button secondary"
-            onClick={() => onNavigate('home')}
-            disabled={isSubmitting}
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            className="button primary"
-            disabled={isSubmitting || userRole !== 'admin'}
-          >
-            {isSubmitting
-              ? 'Submitting...'
-              : userRole !== 'admin'
-                ? 'Admin Access Required'
-                : formData.phoneNumber && validatePhoneForSMS(formData.phoneNumber).isValid
-                  ? 'Report Found Disc and Send Text Message'
-                  : 'Report Found Disc'
-            }
-          </button>
-        </div>
+        {/* Final Form Actions - Only show when additional details are expanded */}
+        {showAdditionalDetails && (
+          <div className="form-actions final-actions">
+            <button
+              type="button"
+              className="button secondary"
+              onClick={() => onNavigate('home')}
+              disabled={isSubmitting}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="button primary"
+              disabled={isSubmitting || userRole !== 'admin'}
+            >
+              {isSubmitting
+                ? 'Submitting...'
+                : userRole !== 'admin'
+                  ? 'Admin Access Required'
+                  : formData.phoneNumber && validatePhoneForSMS(formData.phoneNumber).isValid
+                    ? 'Report Found Disc and Send Text Message'
+                    : 'Report Found Disc'
+              }
+            </button>
+          </div>
+        )}
       </form>
     </div>
   );
@@ -1049,7 +1051,6 @@ function SearchLost({ onNavigate }: PageProps) {
                     <div className="disc-header">
                       <h4>{disc.brand} {disc.mold || 'Unknown Mold'}</h4>
                       <div className="disc-meta">
-                        <span className="disc-type">{disc.disc_type || 'Unknown Type'}</span>
                         {disc.rack_id && <span className="rack-id">Rack #{disc.rack_id}</span>}
                       </div>
                     </div>
@@ -1082,10 +1083,12 @@ function SearchLost({ onNavigate }: PageProps) {
                     )}
 
                     <div className="disc-details">
-                      <div className="detail-row">
-                        <span className="label">Color:</span>
-                        <span className="value">{disc.color}</span>
-                      </div>
+                      {disc.color && (
+                        <div className="detail-row">
+                          <span className="label">Color:</span>
+                          <span className="value">{disc.color}</span>
+                        </div>
+                      )}
 
                       {disc.weight && (
                         <div className="detail-row">
@@ -1094,10 +1097,12 @@ function SearchLost({ onNavigate }: PageProps) {
                         </div>
                       )}
 
-                      <div className="detail-row">
-                        <span className="label">Condition:</span>
-                        <span className="value">{disc.condition || 'Unknown'}</span>
-                      </div>
+                      {disc.condition && disc.condition.toLowerCase() !== 'unknown' && (
+                        <div className="detail-row">
+                          <span className="label">Condition:</span>
+                          <span className="value">{disc.condition}</span>
+                        </div>
+                      )}
 
                       {disc.source_name && (
                         <div className="detail-row">
@@ -1106,10 +1111,12 @@ function SearchLost({ onNavigate }: PageProps) {
                         </div>
                       )}
 
-                      <div className="detail-row">
-                        <span className="label">Specific Location:</span>
-                        <span className="value">{disc.location_found}</span>
-                      </div>
+                      {disc.location_found && disc.location_found.toLowerCase() !== 'exact location unknown.' && disc.location_found.toLowerCase() !== 'unknown' && (
+                        <div className="detail-row">
+                          <span className="label">Specific Location:</span>
+                          <span className="value">{disc.location_found}</span>
+                        </div>
+                      )}
 
                       <div className="detail-row">
                         <span className="label">Found on:</span>
@@ -1138,14 +1145,7 @@ function SearchLost({ onNavigate }: PageProps) {
                       )}
                     </div>
 
-                    <div className="disc-actions">
-                      <button className="button primary small">
-                        Contact Finder
-                      </button>
-                      <button className="button secondary small">
-                        Report as Mine
-                      </button>
-                    </div>
+
                   </div>
                 ))}
               </div>
