@@ -225,7 +225,7 @@ function Home({ onNavigate }: PageProps) {
 }
 
 function ReportFound({ onNavigate }: PageProps) {
-  const { user, isGuest } = useAuth();
+  const { user, isGuest, userRole } = useAuth();
 
   // Get today's date in YYYY-MM-DD format
   const getTodayDate = () => {
@@ -317,7 +317,14 @@ function ReportFound({ onNavigate }: PageProps) {
     try {
       console.log('Form submission started');
       console.log('User:', user);
+      console.log('User role:', userRole);
       console.log('Selected images:', selectedImages.length);
+
+      // Check if user is admin
+      if (userRole !== 'admin') {
+        setSubmitMessage('Error: Only administrators can report found discs. Please sign in as an admin.');
+        return;
+      }
 
       // Check if user is authenticated for image upload
       if (selectedImages.length > 0 && !user) {
@@ -475,6 +482,18 @@ function ReportFound({ onNavigate }: PageProps) {
         </button>
         <h1>Report a Found Disc</h1>
         <p>Help reunite a disc with its owner by providing details about the disc you found.</p>
+        {userRole !== 'admin' && (
+          <div className="admin-notice" style={{
+            backgroundColor: '#fff3cd',
+            border: '1px solid #ffeaa7',
+            borderRadius: '4px',
+            padding: '12px',
+            margin: '16px 0',
+            color: '#856404'
+          }}>
+            <strong>⚠️ Admin Access Required:</strong> Only administrators can report found discs. Please sign in as an admin to access this feature.
+          </div>
+        )}
       </div>
 
       {!user && (
@@ -720,9 +739,9 @@ function ReportFound({ onNavigate }: PageProps) {
           <button
             type="submit"
             className="button primary"
-            disabled={isSubmitting || !user}
+            disabled={isSubmitting || userRole !== 'admin'}
           >
-            {isSubmitting ? 'Submitting...' : !user ? 'Sign In Required' : 'Report Found Disc'}
+            {isSubmitting ? 'Submitting...' : userRole !== 'admin' ? 'Admin Access Required' : 'Report Found Disc'}
           </button>
         </div>
       </form>

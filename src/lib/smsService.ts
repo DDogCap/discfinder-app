@@ -25,16 +25,23 @@ export interface SMSMessage {
 
 /**
  * Check if SMS is configured and available
+ * In production, this will be handled by the API route
  */
 export function isSMSConfigured(): boolean {
-  const isConfigured = !!(TEXTMAGIC_USERNAME && TEXTMAGIC_API_KEY);
-  console.log('SMS Configuration Check:', {
-    hasUsername: !!TEXTMAGIC_USERNAME,
-    hasApiKey: !!TEXTMAGIC_API_KEY,
-    isConfigured,
-    environment: process.env.NODE_ENV
-  });
-  return isConfigured;
+  // In development, check local environment variables
+  if (process.env.NODE_ENV === 'development') {
+    const isConfigured = !!(TEXTMAGIC_USERNAME && TEXTMAGIC_API_KEY);
+    console.log('SMS Configuration Check (dev):', {
+      hasUsername: !!TEXTMAGIC_USERNAME,
+      hasApiKey: !!TEXTMAGIC_API_KEY,
+      isConfigured,
+      environment: process.env.NODE_ENV
+    });
+    return isConfigured;
+  }
+
+  // In production, assume SMS is available (API route will handle validation)
+  return true;
 }
 
 /**
@@ -69,25 +76,11 @@ export function validatePhoneForSMS(phone: string | null | undefined): {
 }
 
 /**
- * Send SMS message via TextMagic
- * This function makes an actual API call to TextMagic REST API
+ * Send SMS message via TextMagic through our API route
+ * This avoids CORS issues by using a serverless function
  */
 export async function sendSMS(smsMessage: SMSMessage): Promise<SMSResult> {
   try {
-    // Validate SMS configuration
-    if (!isSMSConfigured()) {
-      console.warn('SMS not configured - TextMagic credentials missing');
-      console.warn('Environment variables:', {
-        TEXTMAGIC_USERNAME: TEXTMAGIC_USERNAME ? 'SET' : 'MISSING',
-        TEXTMAGIC_API_KEY: TEXTMAGIC_API_KEY ? 'SET' : 'MISSING',
-        NODE_ENV: process.env.NODE_ENV
-      });
-      return {
-        success: false,
-        error: 'SMS service not configured'
-      };
-    }
-
     // Validate phone number
     const phoneValidation = validatePhoneForSMS(smsMessage.to);
     if (!phoneValidation.isValid) {
@@ -98,48 +91,39 @@ export async function sendSMS(smsMessage: SMSMessage): Promise<SMSResult> {
       };
     }
 
-    // Prepare phone number for TextMagic (remove + prefix for international format)
-    const textMagicPhone = phoneValidation.normalizedPhone?.replace('+', '') || '';
-
-    // Prepare the API request
-    const apiUrl = 'https://rest.textmagic.com/api/v2/messages';
-    const requestBody = {
-      text: smsMessage.message,
-      phones: textMagicPhone
-    };
-
-    console.log('Sending SMS via TextMagic:', {
-      to: textMagicPhone,
+    console.log('Sending SMS via API route:', {
+      to: phoneValidation.normalizedPhone,
       message: smsMessage.message
     });
 
-    // Make the API call to TextMagic
-    const response = await fetch(apiUrl, {
+    // Call our API route instead of TextMagic directly
+    const response = await fetch('/api/send-sms', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'X-TM-Username': TEXTMAGIC_USERNAME!,
-        'X-TM-Key': TEXTMAGIC_API_KEY!
       },
-      body: JSON.stringify(requestBody)
+      body: JSON.stringify({
+        phoneNumber: phoneValidation.normalizedPhone,
+        message: smsMessage.message
+      })
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
-      console.error('TextMagic API error:', response.status, errorData);
+      console.error('SMS API error:', response.status, errorData);
       return {
         success: false,
-        error: `TextMagic API error: ${response.status} - ${errorData.message || 'Unknown error'}`,
+        error: `SMS API error: ${response.status} - ${errorData.error || 'Unknown error'}`,
         phoneNumber: phoneValidation.normalizedPhone
       };
     }
 
     const responseData = await response.json();
-    console.log('TextMagic API response:', responseData);
+    console.log('SMS API response:', responseData);
 
     return {
-      success: true,
-      messageId: responseData.id || responseData.messageId || `tm_${Date.now()}`,
+      success: responseData.success,
+      messageId: responseData.messageId,
       phoneNumber: phoneValidation.normalizedPhone
     };
 
