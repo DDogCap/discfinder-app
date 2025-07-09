@@ -27,7 +27,14 @@ export interface SMSMessage {
  * Check if SMS is configured and available
  */
 export function isSMSConfigured(): boolean {
-  return !!(TEXTMAGIC_USERNAME && TEXTMAGIC_API_KEY);
+  const isConfigured = !!(TEXTMAGIC_USERNAME && TEXTMAGIC_API_KEY);
+  console.log('SMS Configuration Check:', {
+    hasUsername: !!TEXTMAGIC_USERNAME,
+    hasApiKey: !!TEXTMAGIC_API_KEY,
+    isConfigured,
+    environment: process.env.NODE_ENV
+  });
+  return isConfigured;
 }
 
 /**
@@ -70,6 +77,11 @@ export async function sendSMS(smsMessage: SMSMessage): Promise<SMSResult> {
     // Validate SMS configuration
     if (!isSMSConfigured()) {
       console.warn('SMS not configured - TextMagic credentials missing');
+      console.warn('Environment variables:', {
+        TEXTMAGIC_USERNAME: TEXTMAGIC_USERNAME ? 'SET' : 'MISSING',
+        TEXTMAGIC_API_KEY: TEXTMAGIC_API_KEY ? 'SET' : 'MISSING',
+        NODE_ENV: process.env.NODE_ENV
+      });
       return {
         success: false,
         error: 'SMS service not configured'
