@@ -253,6 +253,15 @@ function ReportFound({ onNavigate }: PageProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitMessage, setSubmitMessage] = useState('');
   const [sources, setSources] = useState<Source[]>([]);
+  const [showAdditionalDetails, setShowAdditionalDetails] = useState(false);
+
+  // Auto-focus the mold field when the page loads
+  useEffect(() => {
+    const moldField = document.getElementById('mold');
+    if (moldField) {
+      moldField.focus();
+    }
+  }, []);
 
   // Load active sources for the dropdown and user's default source
   useEffect(() => {
@@ -517,22 +526,16 @@ function ReportFound({ onNavigate }: PageProps) {
       )}
 
       <form className="disc-form" onSubmit={handleSubmit} style={{ opacity: !user ? 0.6 : 1 }}>
-        <div className="form-section">
-          <h3>Disc Information</h3>
+        {/* Critical Information Section */}
+        <div className="form-section critical-section">
+          <h3>Critical Information</h3>
+          <p className="form-section-description">
+            Start with these essential details to quickly report the found disc.
+          </p>
+
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="brand">Brand</label>
-              <input
-                type="text"
-                id="brand"
-                name="brand"
-                value={formData.brand}
-                onChange={handleInputChange}
-                placeholder="e.g., Innova, Discraft, Dynamic Discs"
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="mold">Mold *</label>
+              <label htmlFor="mold">Mold / Disc *</label>
               <input
                 type="text"
                 id="mold"
@@ -540,87 +543,19 @@ function ReportFound({ onNavigate }: PageProps) {
                 value={formData.mold}
                 onChange={handleInputChange}
                 required
-                placeholder="e.g., Destroyer, Buzzz, Judge"
+                placeholder="e.g., Destroyer, Buzzz, Judge, or any disc name"
+                autoFocus
               />
             </div>
-          </div>
-
-          <div className="form-row">
             <div className="form-group">
-              <label htmlFor="discType">Disc Type</label>
+              <label htmlFor="nameOnDisc">Name on Disc</label>
               <input
                 type="text"
-                id="discType"
-                name="discType"
-                value={formData.discType}
+                id="nameOnDisc"
+                name="nameOnDisc"
+                value={formData.nameOnDisc}
                 onChange={handleInputChange}
-                placeholder="e.g., Putter, Midrange, Fairway Driver, Distance Driver"
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="color">Color</label>
-              <input
-                type="text"
-                id="color"
-                name="color"
-                value={formData.color}
-                onChange={handleInputChange}
-                placeholder="e.g., Blue, Red, Orange"
-              />
-            </div>
-          </div>
-
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="weight">Weight (grams)</label>
-              <input
-                type="number"
-                id="weight"
-                name="weight"
-                value={formData.weight}
-                onChange={handleInputChange}
-                placeholder="e.g., 175"
-                min="100"
-                max="200"
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="condition">Condition</label>
-              <input
-                type="text"
-                id="condition"
-                name="condition"
-                value={formData.condition}
-                onChange={handleInputChange}
-                placeholder="e.g., New, Excellent, Good, Fair, Poor"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="form-section">
-          <h3>Additional Details</h3>
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="plasticType">Plastic Type</label>
-              <input
-                type="text"
-                id="plasticType"
-                name="plasticType"
-                value={formData.plasticType}
-                onChange={handleInputChange}
-                placeholder="e.g., Champion, ESP, Lucid"
-              />
-            </div>
-            <div className="form-group">
-              <label htmlFor="stampText">Stamp/Text</label>
-              <input
-                type="text"
-                id="stampText"
-                name="stampText"
-                value={formData.stampText}
-                onChange={handleInputChange}
-                placeholder="Any text or stamps on the disc"
+                placeholder="Name written on disc"
               />
             </div>
           </div>
@@ -637,23 +572,6 @@ function ReportFound({ onNavigate }: PageProps) {
                 placeholder="Phone number written on disc"
               />
             </div>
-            <div className="form-group">
-              <label htmlFor="nameOnDisc">Name on Disc</label>
-              <input
-                type="text"
-                id="nameOnDisc"
-                name="nameOnDisc"
-                value={formData.nameOnDisc}
-                onChange={handleInputChange}
-                placeholder="Name written on disc"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="form-section">
-          <h3>Location & Date</h3>
-          <div className="form-row">
             <div className="form-group">
               <label htmlFor="sourceId">Source *</label>
               <select
@@ -673,47 +591,10 @@ function ReportFound({ onNavigate }: PageProps) {
               </select>
               <small className="form-help">Choose the general location or event where the disc was found</small>
             </div>
-            <div className="form-group">
-              <label htmlFor="foundDate">Date Found *</label>
-              <input
-                type="date"
-                id="foundDate"
-                name="foundDate"
-                value={formData.foundDate}
-                onChange={handleInputChange}
-                required
-              />
-            </div>
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label htmlFor="locationFound">Specific Location *</label>
-              <input
-                type="text"
-                id="locationFound"
-                name="locationFound"
-                value={formData.locationFound}
-                onChange={handleInputChange}
-                required
-                placeholder="e.g., East Pond, Hole 7, Near the basket (or leave default)"
-              />
-              <small className="form-help">Provide specific details about where within the source location. Defaults to "Exact location unknown." if not changed.</small>
-            </div>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="description">Additional Description</label>
-            <textarea
-              id="description"
-              name="description"
-              value={formData.description}
-              onChange={handleInputChange}
-              rows={4}
-              placeholder="Any additional details about where or how you found the disc..."
-            />
           </div>
         </div>
 
+        {/* Disc Images Section */}
         <div className="form-section">
           <h3>Disc Images</h3>
           <p className="form-section-description">
@@ -727,7 +608,179 @@ function ReportFound({ onNavigate }: PageProps) {
           />
         </div>
 
-        <div className="form-actions">
+        {/* Quick Report Button */}
+        <div className="form-actions quick-report">
+          <button
+            type="submit"
+            className="button primary large"
+            disabled={isSubmitting || userRole !== 'admin'}
+          >
+            {isSubmitting
+              ? 'Submitting...'
+              : userRole !== 'admin'
+                ? 'Admin Access Required'
+                : formData.phoneNumber && validatePhoneForSMS(formData.phoneNumber).isValid
+                  ? 'Report Found Disc and Send Text Message'
+                  : 'Report Found Disc'
+            }
+          </button>
+          <button
+            type="button"
+            className="button secondary"
+            onClick={() => setShowAdditionalDetails(!showAdditionalDetails)}
+            disabled={isSubmitting}
+          >
+            {showAdditionalDetails ? 'Hide Additional Details' : 'Add Additional Details'}
+          </button>
+        </div>
+
+        {/* Additional Details Section - Collapsible */}
+        {showAdditionalDetails && (
+          <>
+            <div className="form-section">
+              <h3>Additional Disc Information</h3>
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="brand">Brand</label>
+                  <input
+                    type="text"
+                    id="brand"
+                    name="brand"
+                    value={formData.brand}
+                    onChange={handleInputChange}
+                    placeholder="e.g., Innova, Discraft, Dynamic Discs"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="discType">Disc Type</label>
+                  <input
+                    type="text"
+                    id="discType"
+                    name="discType"
+                    value={formData.discType}
+                    onChange={handleInputChange}
+                    placeholder="e.g., Putter, Midrange, Fairway Driver, Distance Driver"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="color">Color</label>
+                  <input
+                    type="text"
+                    id="color"
+                    name="color"
+                    value={formData.color}
+                    onChange={handleInputChange}
+                    placeholder="e.g., Blue, Red, Orange"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="weight">Weight (grams)</label>
+                  <input
+                    type="number"
+                    id="weight"
+                    name="weight"
+                    value={formData.weight}
+                    onChange={handleInputChange}
+                    placeholder="e.g., 175"
+                    min="100"
+                    max="200"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="condition">Condition</label>
+                  <input
+                    type="text"
+                    id="condition"
+                    name="condition"
+                    value={formData.condition}
+                    onChange={handleInputChange}
+                    placeholder="e.g., New, Excellent, Good, Fair, Poor"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="plasticType">Plastic Type</label>
+                  <input
+                    type="text"
+                    id="plasticType"
+                    name="plasticType"
+                    value={formData.plasticType}
+                    onChange={handleInputChange}
+                    placeholder="e.g., Champion, ESP, Lucid"
+                  />
+                </div>
+              </div>
+
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="stampText">Stamp/Text</label>
+                  <input
+                    type="text"
+                    id="stampText"
+                    name="stampText"
+                    value={formData.stampText}
+                    onChange={handleInputChange}
+                    placeholder="Any text or stamps on the disc"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="form-section">
+              <h3>Location & Date Details</h3>
+              <div className="form-row">
+                <div className="form-group">
+                  <label htmlFor="foundDate">Date Found *</label>
+                  <input
+                    type="date"
+                    id="foundDate"
+                    name="foundDate"
+                    value={formData.foundDate}
+                    onChange={handleInputChange}
+                    required
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="locationFound">Specific Location *</label>
+                  <input
+                    type="text"
+                    id="locationFound"
+                    name="locationFound"
+                    value={formData.locationFound}
+                    onChange={handleInputChange}
+                    required
+                    placeholder="e.g., East Pond, Hole 7, Near the basket (or leave default)"
+                  />
+                  <small className="form-help">Provide specific details about where within the source location. Defaults to "Exact location unknown." if not changed.</small>
+                </div>
+              </div>
+
+              <div className="form-group">
+                <label htmlFor="description">Additional Description</label>
+                <textarea
+                  id="description"
+                  name="description"
+                  value={formData.description}
+                  onChange={handleInputChange}
+                  rows={4}
+                  placeholder="Any additional details about where or how you found the disc..."
+                />
+              </div>
+            </div>
+          </>
+        )}
+
+
+
+
+
+        {/* Final Form Actions */}
+        <div className="form-actions final-actions">
           <button
             type="button"
             className="button secondary"
@@ -741,7 +794,14 @@ function ReportFound({ onNavigate }: PageProps) {
             className="button primary"
             disabled={isSubmitting || userRole !== 'admin'}
           >
-            {isSubmitting ? 'Submitting...' : userRole !== 'admin' ? 'Admin Access Required' : 'Report Found Disc'}
+            {isSubmitting
+              ? 'Submitting...'
+              : userRole !== 'admin'
+                ? 'Admin Access Required'
+                : formData.phoneNumber && validatePhoneForSMS(formData.phoneNumber).isValid
+                  ? 'Report Found Disc and Send Text Message'
+                  : 'Report Found Disc'
+            }
           </button>
         </div>
       </form>
