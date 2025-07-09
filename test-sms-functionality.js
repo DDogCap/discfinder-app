@@ -38,10 +38,9 @@ function validatePhoneForSMS(phone) {
 }
 
 function isSMSConfigured() {
-  const TWILIO_ACCOUNT_SID = process.env.REACT_APP_TWILIO_ACCOUNT_SID;
-  const TWILIO_AUTH_TOKEN = process.env.REACT_APP_TWILIO_AUTH_TOKEN;
-  const TWILIO_PHONE_NUMBER = process.env.REACT_APP_TWILIO_PHONE_NUMBER;
-  return !!(TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_PHONE_NUMBER);
+  const TEXTMAGIC_USERNAME = process.env.REACT_APP_TEXTMAGIC_USERNAME;
+  const TEXTMAGIC_API_KEY = process.env.REACT_APP_TEXTMAGIC_API_KEY;
+  return !!(TEXTMAGIC_USERNAME && TEXTMAGIC_API_KEY);
 }
 
 async function sendFoundDiscNotification(phoneNumber, messageTemplate, foundDiscId, sourceId) {
@@ -70,7 +69,7 @@ async function testSMSFunctionality() {
   console.log(`   SMS Configured: ${isConfigured ? '✅ Yes' : '❌ No'}`);
   
   if (!isConfigured) {
-    console.log('   Note: Add Twilio credentials to .env.local to enable SMS');
+    console.log('   Note: Add TextMagic credentials to .env.local to enable SMS');
   }
   console.log('');
 

@@ -1,14 +1,13 @@
 /**
- * SMS Service for sending text messages via Twilio
+ * SMS Service for sending text messages via TextMagic
  * Handles automatic SMS notifications when found discs are entered
  */
 
 import { normalizePhoneNumber, validatePhoneNumber } from '../utils/phoneUtils';
 
-// Twilio configuration from environment variables
-const TWILIO_ACCOUNT_SID = process.env.REACT_APP_TWILIO_ACCOUNT_SID;
-const TWILIO_AUTH_TOKEN = process.env.REACT_APP_TWILIO_AUTH_TOKEN;
-const TWILIO_PHONE_NUMBER = process.env.REACT_APP_TWILIO_PHONE_NUMBER;
+// TextMagic configuration from environment variables
+const TEXTMAGIC_USERNAME = process.env.REACT_APP_TEXTMAGIC_USERNAME;
+const TEXTMAGIC_API_KEY = process.env.REACT_APP_TEXTMAGIC_API_KEY;
 
 export interface SMSResult {
   success: boolean;
@@ -28,7 +27,7 @@ export interface SMSMessage {
  * Check if SMS is configured and available
  */
 export function isSMSConfigured(): boolean {
-  return !!(TWILIO_ACCOUNT_SID && TWILIO_AUTH_TOKEN && TWILIO_PHONE_NUMBER);
+  return !!(TEXTMAGIC_USERNAME && TEXTMAGIC_API_KEY);
 }
 
 /**
@@ -63,15 +62,14 @@ export function validatePhoneForSMS(phone: string | null | undefined): {
 }
 
 /**
- * Send SMS message via Twilio
- * This is a client-side function that would typically call a backend API
- * For now, it simulates the SMS sending process
+ * Send SMS message via TextMagic
+ * This function makes an actual API call to TextMagic REST API
  */
 export async function sendSMS(smsMessage: SMSMessage): Promise<SMSResult> {
   try {
     // Validate SMS configuration
     if (!isSMSConfigured()) {
-      console.warn('SMS not configured - Twilio credentials missing');
+      console.warn('SMS not configured - TextMagic credentials missing');
       return {
         success: false,
         error: 'SMS service not configured'
@@ -88,22 +86,48 @@ export async function sendSMS(smsMessage: SMSMessage): Promise<SMSResult> {
       };
     }
 
-    // In a real implementation, this would call a backend API that uses Twilio
-    // For now, we'll simulate the API call
-    console.log('SMS would be sent:', {
-      to: phoneValidation.normalizedPhone,
-      message: smsMessage.message,
-      from: TWILIO_PHONE_NUMBER
+    // Prepare phone number for TextMagic (remove + prefix for international format)
+    const textMagicPhone = phoneValidation.normalizedPhone?.replace('+', '') || '';
+
+    // Prepare the API request
+    const apiUrl = 'https://rest.textmagic.com/api/v2/messages';
+    const requestBody = {
+      text: smsMessage.message,
+      phones: textMagicPhone
+    };
+
+    console.log('Sending SMS via TextMagic:', {
+      to: textMagicPhone,
+      message: smsMessage.message
     });
 
-    // Simulate API call delay
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Make the API call to TextMagic
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-TM-Username': TEXTMAGIC_USERNAME!,
+        'X-TM-Key': TEXTMAGIC_API_KEY!
+      },
+      body: JSON.stringify(requestBody)
+    });
 
-    // For development, always return success
-    // In production, this would make an actual API call
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error('TextMagic API error:', response.status, errorData);
+      return {
+        success: false,
+        error: `TextMagic API error: ${response.status} - ${errorData.message || 'Unknown error'}`,
+        phoneNumber: phoneValidation.normalizedPhone
+      };
+    }
+
+    const responseData = await response.json();
+    console.log('TextMagic API response:', responseData);
+
     return {
       success: true,
-      messageId: `sim_${Date.now()}`,
+      messageId: responseData.id || responseData.messageId || `tm_${Date.now()}`,
       phoneNumber: phoneValidation.normalizedPhone
     };
 
