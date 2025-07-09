@@ -194,20 +194,17 @@ async function testTextMagicIntegration() {
   });
   console.log('');
 
-  // Test 3: Send test SMS (only if user confirms)
+  // Test 3: Send test SMS
   console.log('3. SMS Sending Test:');
-  console.log('   ⚠️  This will send an actual SMS and consume credits!');
-  console.log('   To test SMS sending, uncomment the test code below and add a valid phone number.');
+  console.log('   Testing actual SMS sending to debug any issues...');
   console.log('');
-  
-  // Uncomment and modify the following lines to test actual SMS sending:
-  /*
-  const testPhone = '+1234567890'; // Replace with your test phone number
-  const testMessage = 'Test message from DZDiscFinder - TextMagic integration working!';
-  
+
+  const testPhone = '7855548144'; // Your phone number
+  const testMessage = 'Test message from DZDiscFinder - TextMagic integration test!';
+
   console.log('   Sending test SMS...');
   const result = await sendTextMagicSMS(testPhone, testMessage);
-  
+
   if (result.success) {
     console.log('   ✅ SMS sent successfully!');
     console.log(`   📱 To: ${result.phoneNumber}`);
@@ -215,8 +212,10 @@ async function testTextMagicIntegration() {
     console.log(`   📋 Response:`, result.response);
   } else {
     console.log('   ❌ SMS sending failed:', result.error);
+    if (result.phoneNumber) {
+      console.log(`   📱 Phone: ${result.phoneNumber}`);
+    }
   }
-  */
 
   console.log('✅ TextMagic integration test completed!');
   console.log('\nNext steps:');
