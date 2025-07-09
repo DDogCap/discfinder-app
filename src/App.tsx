@@ -77,13 +77,6 @@ function AppContent() {
             DZDiscFinder
           </div>
           <div className="nav-buttons flex items-center space-x-2 flex-wrap">
-            <button className="nav-button px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors" onClick={() => setCurrentPage('report-found')}>
-              Report Found
-            </button>
-            <button className="nav-button px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors" onClick={() => setCurrentPage('search-lost')}>
-              Search Found
-            </button>
-
             {user ? (
               <div className="user-menu flex items-center space-x-2 flex-wrap">
                 <span className="user-info text-xs text-gray-600 px-2 py-1 bg-gray-100 rounded hidden sm:inline">
@@ -952,9 +945,7 @@ function SearchLost({ onNavigate }: PageProps) {
       <div className="search-container">
         <form className="search-form" onSubmit={handleSearch}>
           <div className="search-section">
-            <h3>Search Found Discs</h3>
             <div className="form-group">
-              <label htmlFor="search-query">Search</label>
               <input
                 type="text"
                 id="search-query"
@@ -1049,10 +1040,11 @@ function SearchLost({ onNavigate }: PageProps) {
                 {foundDiscs.map((disc) => (
                   <div key={disc.id} className="disc-card">
                     <div className="disc-header">
-                      <h4>{disc.brand} {disc.mold || 'Unknown Mold'}</h4>
-                      <div className="disc-meta">
-                        {disc.rack_id && <span className="rack-id">Rack #{disc.rack_id}</span>}
-                      </div>
+                      <h4>
+                        {disc.rack_id && `#${disc.rack_id} `}
+                        {disc.brand && disc.brand.toLowerCase() !== 'not specified' ? `${disc.brand} ` : ''}
+                        {disc.mold || 'Unknown Mold'}
+                      </h4>
                     </div>
 
                     {/* Return Status - only show for admin or if not 'Found' */}
@@ -1097,7 +1089,7 @@ function SearchLost({ onNavigate }: PageProps) {
                         </div>
                       )}
 
-                      {disc.condition && disc.condition.toLowerCase() !== 'unknown' && (
+                      {disc.condition && disc.condition.toLowerCase() !== 'unknown' && disc.condition.toLowerCase() !== 'not specified' && (
                         <div className="detail-row">
                           <span className="label">Condition:</span>
                           <span className="value">{disc.condition}</span>
