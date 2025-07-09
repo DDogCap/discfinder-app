@@ -71,51 +71,51 @@ function AppContent() {
 
   return (
     <div className="app">
-      <nav className="navbar">
-        <div className="nav-container">
-          <div className="logo" onClick={() => setCurrentPage('home')}>
+      <nav className="navbar bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
+        <div className="nav-container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="logo text-xl font-bold text-blue-600 cursor-pointer py-2" onClick={() => setCurrentPage('home')}>
             DZDiscFinder
           </div>
-          <div className="nav-buttons">
-            <button className="nav-button" onClick={() => setCurrentPage('report-found')}>
+          <div className="nav-buttons flex items-center space-x-2 flex-wrap">
+            <button className="nav-button px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors" onClick={() => setCurrentPage('report-found')}>
               Report Found
             </button>
-            <button className="nav-button" onClick={() => setCurrentPage('search-lost')}>
+            <button className="nav-button px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors" onClick={() => setCurrentPage('search-lost')}>
               Search Found
             </button>
 
             {user ? (
-              <div className="user-menu">
-                <span className="user-info">
+              <div className="user-menu flex items-center space-x-2 flex-wrap">
+                <span className="user-info text-xs text-gray-600 px-2 py-1 bg-gray-100 rounded hidden sm:inline">
                   {user.email} ({userRole})
                 </span>
-                <button className="nav-button" onClick={() => setCurrentPage('profile')}>
+                <button className="nav-button px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors" onClick={() => setCurrentPage('profile')}>
                   Profile
                 </button>
                 {userRole === 'admin' && (
                   <>
-                    <button className="nav-button" onClick={() => setCurrentPage('admin')}>
+                    <button className="nav-button px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors" onClick={() => setCurrentPage('admin')}>
                       Admin
                     </button>
-                    <button className="nav-button" onClick={() => setCurrentPage('profile-import')}>
+                    <button className="nav-button px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors hidden md:inline-block" onClick={() => setCurrentPage('profile-import')}>
                       Import
                     </button>
-                    <button className="nav-button" onClick={() => setCurrentPage('photo-migration')}>
+                    <button className="nav-button px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors hidden md:inline-block" onClick={() => setCurrentPage('photo-migration')}>
                       Photos
                     </button>
                   </>
                 )}
                 {userRole === 'rakerdiver' && (
-                  <button className="nav-button" onClick={() => setCurrentPage('rakerdiver')}>
+                  <button className="nav-button px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors" onClick={() => setCurrentPage('rakerdiver')}>
                     RakerDiver
                   </button>
                 )}
-                <button className="nav-button" onClick={handleSignOut}>
+                <button className="nav-button px-3 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors" onClick={handleSignOut}>
                   Sign Out
                 </button>
               </div>
             ) : (
-              <button className="nav-button primary" onClick={() => setCurrentPage('login')}>
+              <button className="nav-button primary px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-md transition-colors" onClick={() => setCurrentPage('login')}>
                 Sign In
               </button>
             )}

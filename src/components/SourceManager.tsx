@@ -211,77 +211,146 @@ const SourceManager: React.FC<SourceManagerProps> = ({ onClose }) => {
                 <p>No sources found. Add your first source to get started.</p>
               </div>
             ) : (
-              <div className="sources-table">
-                <div className="sources-header">
-                  <div className="source-col-name">Source Name</div>
-                  <div className="source-col-status">Status</div>
-                  <div className="source-col-order">Order</div>
-                  <div className="source-col-message">SMS Message</div>
-                  <div className="source-col-actions">Actions</div>
-                </div>
-                {sources.map((source) => (
-                  <div key={source.id} className="source-row">
-                    {editingSource?.id === source.id ? (
-                      <div className="source-edit-form">
-                        <EditSourceForm
-                          source={editingSource}
-                          onSave={handleUpdateSource}
-                          onCancel={() => setEditingSource(null)}
-                          onChange={setEditingSource}
-                        />
-                      </div>
-                    ) : (
-                      <>
-                        <div className="source-col-name">
-                          <div className="source-name">{source.name}</div>
-                          {source.description && (
-                            <div className="source-description">{source.description}</div>
-                          )}
-                        </div>
-                        <div className="source-col-status">
-                          <span className={`status-badge ${source.is_active ? 'active' : 'inactive'}`}>
-                            {source.is_active ? 'Active' : 'Inactive'}
-                          </span>
-                        </div>
-                        <div className="source-col-order">
-                          <span className="order-number">{source.sort_order}</span>
-                        </div>
-                        <div className="source-col-message">
-                          {source.msg1_found_just_entered ? (
-                            <div className="message-preview">
-                              <span className="message-text">
-                                {source.msg1_found_just_entered.length > 50
-                                  ? `${source.msg1_found_just_entered.substring(0, 50)}...`
-                                  : source.msg1_found_just_entered
-                                }
-                              </span>
-                              <span className="message-indicator">✓ SMS Configured</span>
-                            </div>
-                          ) : (
-                            <span className="no-message">No SMS message</span>
-                          )}
-                        </div>
-                        <div className="source-col-actions">
-                          <button
-                            onClick={() => setEditingSource(source)}
-                            className="button secondary small"
-                            title="Edit source"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => handleToggleActive(source)}
-                            className={`button small ${source.is_active ? 'secondary' : 'primary'}`}
-                            title={source.is_active ? 'Deactivate source' : 'Activate source'}
-                          >
-                            {source.is_active ? 'Deactivate' : 'Activate'}
-                          </button>
-                        </div>
-                      </>
-                    )}
+              <>
+                {/* Desktop Table View */}
+                <div className="sources-table">
+                  <div className="sources-header">
+                    <div className="source-col-name">Source Name</div>
+                    <div className="source-col-status">Status</div>
+                    <div className="source-col-order">Order</div>
+                    <div className="source-col-message">SMS Message</div>
+                    <div className="source-col-actions">Actions</div>
                   </div>
-                ))}
-              </div>
+                  {sources.map((source) => (
+                    <div key={source.id} className="source-row">
+                      {editingSource?.id === source.id ? (
+                        <div className="source-edit-form">
+                          <EditSourceForm
+                            source={editingSource}
+                            onSave={handleUpdateSource}
+                            onCancel={() => setEditingSource(null)}
+                            onChange={setEditingSource}
+                          />
+                        </div>
+                      ) : (
+                        <>
+                          <div className="source-col-name">
+                            <div className="source-name">{source.name}</div>
+                            {source.description && (
+                              <div className="source-description">{source.description}</div>
+                            )}
+                          </div>
+                          <div className="source-col-status">
+                            <span className={`status-badge ${source.is_active ? 'active' : 'inactive'}`}>
+                              {source.is_active ? 'Active' : 'Inactive'}
+                            </span>
+                          </div>
+                          <div className="source-col-order">
+                            <span className="order-number">{source.sort_order}</span>
+                          </div>
+                          <div className="source-col-message">
+                            {source.msg1_found_just_entered ? (
+                              <div className="message-preview">
+                                <span className="message-text">
+                                  {source.msg1_found_just_entered.length > 50
+                                    ? `${source.msg1_found_just_entered.substring(0, 50)}...`
+                                    : source.msg1_found_just_entered
+                                  }
+                                </span>
+                                <span className="message-indicator">✓ SMS Configured</span>
+                              </div>
+                            ) : (
+                              <span className="no-message">No SMS message</span>
+                            )}
+                          </div>
+                          <div className="source-col-actions">
+                            <button
+                              onClick={() => setEditingSource(source)}
+                              className="button secondary small"
+                              title="Edit source"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => handleToggleActive(source)}
+                              className={`button small ${source.is_active ? 'secondary' : 'primary'}`}
+                              title={source.is_active ? 'Deactivate source' : 'Activate source'}
+                            >
+                              {source.is_active ? 'Deactivate' : 'Activate'}
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Mobile Card View */}
+                <div className="sources-mobile">
+                  <div className="source-grid">
+                    {sources.map((source) => (
+                      <div key={source.id} className="source-card">
+                        {editingSource?.id === source.id ? (
+                          <EditSourceForm
+                            source={editingSource}
+                            onSave={handleUpdateSource}
+                            onCancel={() => setEditingSource(null)}
+                            onChange={setEditingSource}
+                          />
+                        ) : (
+                          <>
+                            <div className="source-card-header">
+                              <h4>{source.name}</h4>
+                              <div className="source-card-meta">
+                                <span className={`status-badge ${source.is_active ? 'active' : 'inactive'}`}>
+                                  {source.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                                <span className="order-number">Order {source.sort_order}</span>
+                              </div>
+                            </div>
+
+                            {source.description && (
+                              <div className="source-card-description">
+                                {source.description}
+                              </div>
+                            )}
+
+                            <div className="source-card-message">
+                              <div className="source-card-message-label">SMS Message Template:</div>
+                              {source.msg1_found_just_entered ? (
+                                <div className="source-card-message-text">
+                                  {source.msg1_found_just_entered}
+                                </div>
+                              ) : (
+                                <div className="source-card-message-empty">
+                                  No SMS message configured
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="source-card-actions">
+                              <button
+                                onClick={() => setEditingSource(source)}
+                                className="button secondary small"
+                                title="Edit source"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() => handleToggleActive(source)}
+                                className={`button small ${source.is_active ? 'secondary' : 'primary'}`}
+                                title={source.is_active ? 'Deactivate source' : 'Activate source'}
+                              >
+                                {source.is_active ? 'Deactivate' : 'Activate'}
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>
