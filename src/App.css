@@ -205,4 +205,125 @@
   .status-badge.pending {
     @apply bg-red-100 text-red-800;
   }
+
+  /* Sources Table Styling */
+  .sources-table {
+    @apply border border-gray-200 rounded-lg overflow-hidden bg-white;
+  }
+
+  .sources-header {
+    @apply grid gap-4 p-4 bg-gray-50 border-b border-gray-200 font-semibold text-sm text-gray-700 uppercase tracking-wide;
+    grid-template-columns: 2fr 120px 80px 2fr 160px;
+  }
+
+  .source-row {
+    @apply grid gap-4 p-4 border-b border-gray-100 items-center transition-colors hover:bg-gray-50;
+    grid-template-columns: 2fr 120px 80px 2fr 160px;
+  }
+
+  .source-row:last-child {
+    @apply border-b-0;
+  }
+
+  .source-col-name {
+    @apply flex flex-col gap-1;
+  }
+
+  .source-name {
+    @apply font-semibold text-gray-900 text-base;
+  }
+
+  .source-description {
+    @apply text-sm text-gray-600 leading-relaxed;
+  }
+
+  .source-col-status {
+    @apply flex justify-center;
+  }
+
+  .status-badge.active {
+    @apply bg-green-100 text-green-800 border border-green-200;
+  }
+
+  .status-badge.inactive {
+    @apply bg-red-100 text-red-800 border border-red-200;
+  }
+
+  .source-col-order {
+    @apply text-center;
+  }
+
+  .order-number {
+    @apply inline-block bg-gray-100 text-gray-700 px-2 py-1 rounded font-medium text-sm;
+  }
+
+  .source-col-message {
+    @apply flex flex-col gap-1;
+  }
+
+  .message-preview {
+    @apply flex flex-col gap-1;
+  }
+
+  .message-text {
+    @apply text-sm text-gray-700 leading-relaxed;
+  }
+
+  .message-indicator {
+    @apply text-xs text-green-600 font-medium;
+  }
+
+  .no-message {
+    @apply text-sm text-gray-400 italic;
+  }
+
+  .source-col-actions {
+    @apply flex gap-2 justify-end;
+  }
+
+  .source-edit-form {
+    @apply col-span-full bg-gray-50 p-5 rounded-lg border-2 border-gray-200;
+  }
+
+  .empty-state {
+    @apply text-center py-10 px-5 text-gray-600 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300;
+  }
+
+  .empty-state p {
+    @apply m-0 text-base;
+  }
+
+  /* Responsive design for sources table */
+  @media (max-width: 1024px) {
+    .sources-header {
+      @apply hidden;
+    }
+
+    .sources-table {
+      @apply space-y-2 border-0 bg-transparent;
+    }
+
+    .source-row {
+      @apply block p-4 border border-gray-200 rounded-lg mb-2 bg-white;
+      grid-template-columns: none;
+    }
+
+    .source-col-name,
+    .source-col-status,
+    .source-col-order,
+    .source-col-message,
+    .source-col-actions {
+      @apply mb-3;
+    }
+
+    .source-col-name:before { content: "Name: "; @apply font-semibold; }
+    .source-col-status:before { content: "Status: "; @apply font-semibold; }
+    .source-col-order:before { content: "Order: "; @apply font-semibold; }
+    .source-col-message:before { content: "SMS Message: "; @apply font-semibold block mb-1; }
+    .source-col-actions:before { content: "Actions: "; @apply font-semibold block mb-2; }
+
+    .source-col-actions {
+      @apply flex gap-2 justify-start;
+    }
+  }
 }

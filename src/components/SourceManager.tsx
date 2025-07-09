@@ -15,7 +15,8 @@ const SourceManager: React.FC<SourceManagerProps> = ({ onClose }) => {
     description: '',
     is_active: true,
     sort_order: 0,
-    legacy_row_id: ''
+    legacy_row_id: '',
+    msg1_found_just_entered: ''
   });
   const [showAddForm, setShowAddForm] = useState(false);
 
@@ -40,7 +41,7 @@ const SourceManager: React.FC<SourceManagerProps> = ({ onClose }) => {
     e.preventDefault();
     try {
       await supabaseService.createSource(newSource);
-      setNewSource({ name: '', description: '', is_active: true, sort_order: 0, legacy_row_id: '' });
+      setNewSource({ name: '', description: '', is_active: true, sort_order: 0, legacy_row_id: '', msg1_found_just_entered: '' });
       setShowAddForm(false);
       await loadSources();
     } catch (err) {
@@ -55,7 +56,8 @@ const SourceManager: React.FC<SourceManagerProps> = ({ onClose }) => {
         name: source.name,
         description: source.description,
         is_active: source.is_active,
-        sort_order: source.sort_order
+        sort_order: source.sort_order,
+        msg1_found_just_entered: source.msg1_found_just_entered
       });
       setEditingSource(null);
       await loadSources();
@@ -164,6 +166,19 @@ const SourceManager: React.FC<SourceManagerProps> = ({ onClose }) => {
                   />
                 </div>
                 <div className="form-group">
+                  <label htmlFor="new-message">SMS Message Template</label>
+                  <textarea
+                    id="new-message"
+                    value={newSource.msg1_found_just_entered}
+                    onChange={(e) => setNewSource({ ...newSource, msg1_found_just_entered: e.target.value })}
+                    rows={3}
+                    placeholder="Message sent when a disc is found at this location (e.g., 'Your disc has been found at Jones Park and is available for pickup at DZDiscs store.')"
+                  />
+                  <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '4px', display: 'block' }}>
+                    This message will be sent via SMS when someone reports finding a disc at this location.
+                  </small>
+                </div>
+                <div className="form-group">
                   <label className="checkbox-label">
                     <input
                       type="checkbox"
@@ -190,59 +205,74 @@ const SourceManager: React.FC<SourceManagerProps> = ({ onClose }) => {
           )}
 
           <div className="form-section">
-            <h3>Existing Sources</h3>
+            <h3>Sources ({sources.length})</h3>
             {sources.length === 0 ? (
-              <p className="coming-soon">No sources found.</p>
+              <div className="empty-state">
+                <p>No sources found. Add your first source to get started.</p>
+              </div>
             ) : (
-              <div className="turnin-grid">
+              <div className="sources-table">
+                <div className="sources-header">
+                  <div className="source-col-name">Source Name</div>
+                  <div className="source-col-status">Status</div>
+                  <div className="source-col-order">Order</div>
+                  <div className="source-col-message">SMS Message</div>
+                  <div className="source-col-actions">Actions</div>
+                </div>
                 {sources.map((source) => (
-                  <div
-                    key={source.id}
-                    className={`turnin-card ${source.is_active ? '' : 'opacity-75'}`}
-                  >
+                  <div key={source.id} className="source-row">
                     {editingSource?.id === source.id ? (
-                      <EditSourceForm
-                        source={editingSource}
-                        onSave={handleUpdateSource}
-                        onCancel={() => setEditingSource(null)}
-                        onChange={setEditingSource}
-                      />
+                      <div className="source-edit-form">
+                        <EditSourceForm
+                          source={editingSource}
+                          onSave={handleUpdateSource}
+                          onCancel={() => setEditingSource(null)}
+                          onChange={setEditingSource}
+                        />
+                      </div>
                     ) : (
                       <>
-                        <div className="turnin-header">
-                          <h4>{source.name}</h4>
-                          <span className={`status-badge ${source.is_active ? 'verified' : 'pending'}`}>
+                        <div className="source-col-name">
+                          <div className="source-name">{source.name}</div>
+                          {source.description && (
+                            <div className="source-description">{source.description}</div>
+                          )}
+                        </div>
+                        <div className="source-col-status">
+                          <span className={`status-badge ${source.is_active ? 'active' : 'inactive'}`}>
                             {source.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </div>
-                        <div className="detail-row">
-                          <span className="label">Sort Order:</span>
-                          <span className="value">{source.sort_order}</span>
+                        <div className="source-col-order">
+                          <span className="order-number">{source.sort_order}</span>
                         </div>
-                        {source.legacy_row_id && (
-                          <div className="detail-row">
-                            <span className="label">Legacy ID:</span>
-                            <span className="value" style={{ fontSize: '0.75rem', fontFamily: 'monospace' }}>
-                              {source.legacy_row_id.substring(0, 12)}...
-                            </span>
-                          </div>
-                        )}
-                        {source.description && (
-                          <div className="detail-row">
-                            <span className="label">Description:</span>
-                            <span className="value">{source.description}</span>
-                          </div>
-                        )}
-                        <div className="turnin-actions" style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem' }}>
+                        <div className="source-col-message">
+                          {source.msg1_found_just_entered ? (
+                            <div className="message-preview">
+                              <span className="message-text">
+                                {source.msg1_found_just_entered.length > 50
+                                  ? `${source.msg1_found_just_entered.substring(0, 50)}...`
+                                  : source.msg1_found_just_entered
+                                }
+                              </span>
+                              <span className="message-indicator">✓ SMS Configured</span>
+                            </div>
+                          ) : (
+                            <span className="no-message">No SMS message</span>
+                          )}
+                        </div>
+                        <div className="source-col-actions">
                           <button
                             onClick={() => setEditingSource(source)}
                             className="button secondary small"
+                            title="Edit source"
                           >
                             Edit
                           </button>
                           <button
                             onClick={() => handleToggleActive(source)}
                             className={`button small ${source.is_active ? 'secondary' : 'primary'}`}
+                            title={source.is_active ? 'Deactivate source' : 'Activate source'}
                           >
                             {source.is_active ? 'Deactivate' : 'Activate'}
                           </button>
@@ -313,7 +343,21 @@ const EditSourceForm: React.FC<EditSourceFormProps> = ({ source, onSave, onCance
           value={source.description || ''}
           onChange={(e) => onChange({ ...source, description: e.target.value })}
           rows={2}
+          placeholder="Optional description for this source"
         />
+      </div>
+      <div className="form-group">
+        <label htmlFor={`edit-message-${source.id}`}>SMS Message Template</label>
+        <textarea
+          id={`edit-message-${source.id}`}
+          value={source.msg1_found_just_entered || ''}
+          onChange={(e) => onChange({ ...source, msg1_found_just_entered: e.target.value })}
+          rows={3}
+          placeholder="Message sent when a disc is found at this location (e.g., 'Your disc has been found at Jones Park and is available for pickup at DZDiscs store.')"
+        />
+        <small style={{ color: '#666', fontSize: '0.875rem', marginTop: '4px', display: 'block' }}>
+          This message will be sent via SMS when someone reports finding a disc at this location.
+        </small>
       </div>
       <div className="form-group">
         <label className="checkbox-label">
