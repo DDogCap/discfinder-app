@@ -60,16 +60,19 @@ export interface Source {
   updated_by?: string
 }
 
+export type DiscCondition = 'excellent' | 'good' | 'fair' | 'poor'
+export type DiscType = 'putter' | 'approach' | 'midrange' | 'fairway_driver' | 'distance_driver'
+
 export interface FoundDisc {
   id: string
   finder_id: string
   rack_id?: number
   brand: string
   mold?: string
-  disc_type?: string
+  disc_type?: DiscType
   color: string
   weight?: number
-  condition?: string
+  condition?: DiscCondition
   plastic_type?: string
   stamp_text?: string
   phone_number?: string

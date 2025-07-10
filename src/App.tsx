@@ -11,6 +11,8 @@ import ProfileManager from './components/ProfileManager';
 import PhotoMigrationManager from './components/PhotoMigrationManager';
 import SourceManager from './components/SourceManager';
 import { sendFoundDiscNotification, validatePhoneForSMS } from './lib/smsService';
+import OptimizedImage from './components/OptimizedImage';
+import ImageModal from './components/ImageModal';
 
 
 type Page = 'home' | 'report-found' | 'search-lost' | 'login' | 'admin' | 'rakerdiver' | 'admin-bulk-turnins' | 'profile-import' | 'profile' | 'photo-migration';
@@ -646,14 +648,20 @@ function ReportFound({ onNavigate }: PageProps) {
                 </div>
                 <div className="form-group">
                   <label htmlFor="discType">Disc Type</label>
-                  <input
-                    type="text"
+                  <select
                     id="discType"
                     name="discType"
                     value={formData.discType}
                     onChange={handleInputChange}
-                    placeholder="e.g., Putter, Midrange, Fairway Driver, Distance Driver"
-                  />
+                    className="form-select"
+                  >
+                    <option value="">Select disc type...</option>
+                    <option value="putter">Putter</option>
+                    <option value="approach">Approach</option>
+                    <option value="midrange">Midrange</option>
+                    <option value="fairway_driver">Fairway Driver</option>
+                    <option value="distance_driver">Distance Driver</option>
+                  </select>
                 </div>
               </div>
 
@@ -687,14 +695,19 @@ function ReportFound({ onNavigate }: PageProps) {
               <div className="form-row">
                 <div className="form-group">
                   <label htmlFor="condition">Condition</label>
-                  <input
-                    type="text"
+                  <select
                     id="condition"
                     name="condition"
                     value={formData.condition}
                     onChange={handleInputChange}
-                    placeholder="e.g., New, Excellent, Good, Fair, Poor"
-                  />
+                    className="form-select"
+                  >
+                    <option value="">Select condition...</option>
+                    <option value="excellent">Excellent</option>
+                    <option value="good">Good</option>
+                    <option value="fair">Fair</option>
+                    <option value="poor">Poor</option>
+                  </select>
                 </div>
                 <div className="form-group">
                   <label htmlFor="plasticType">Plastic Type</label>
@@ -818,6 +831,21 @@ function SearchLost({ onNavigate }: PageProps) {
   const [resultsPerPage, setResultsPerPage] = useState(50);
   const [showAllResults, setShowAllResults] = useState(false);
 
+  // Image modal state
+  const [imageModal, setImageModal] = useState<{
+    isOpen: boolean;
+    imageUrl: string;
+    alt: string;
+    images: string[];
+    currentIndex: number;
+  }>({
+    isOpen: false,
+    imageUrl: '',
+    alt: '',
+    images: [],
+    currentIndex: 0
+  });
+
   const handleReturnStatusUpdate = (discId: string, newStatus: ReturnStatus) => {
     // Update the disc in the local state
     setFoundDiscs(prev => prev.map(disc =>
@@ -825,6 +853,34 @@ function SearchLost({ onNavigate }: PageProps) {
         ? { ...disc, return_status: newStatus, returned_at: new Date().toISOString() }
         : disc
     ));
+  };
+
+  const openImageModal = (imageUrl: string, alt: string, allImages: string[], index: number) => {
+    setImageModal({
+      isOpen: true,
+      imageUrl,
+      alt,
+      images: allImages,
+      currentIndex: index
+    });
+  };
+
+  const closeImageModal = () => {
+    setImageModal(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const navigateImage = (direction: 'prev' | 'next') => {
+    setImageModal(prev => {
+      const newIndex = direction === 'prev'
+        ? Math.max(0, prev.currentIndex - 1)
+        : Math.min(prev.images.length - 1, prev.currentIndex + 1);
+
+      return {
+        ...prev,
+        currentIndex: newIndex,
+        imageUrl: prev.images[newIndex]
+      };
+    });
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1060,15 +1116,18 @@ function SearchLost({ onNavigate }: PageProps) {
                     {disc.image_urls && disc.image_urls.length > 0 && (
                       <div className="disc-images">
                         {disc.image_urls.slice(0, 2).map((imageUrl: string, index: number) => (
-                          <img
+                          <OptimizedImage
                             key={index}
                             src={imageUrl}
                             alt={`${disc.brand} ${disc.mold || 'disc'} ${index + 1}`}
                             className="disc-image"
-                            onError={(e) => {
-                              // Hide broken images
-                              (e.target as HTMLImageElement).style.display = 'none';
-                            }}
+                            thumbnail={true}
+                            onClick={() => openImageModal(
+                              imageUrl,
+                              `${disc.brand} ${disc.mold || 'disc'} ${index + 1}`,
+                              disc.image_urls,
+                              index
+                            )}
                           />
                         ))}
                       </div>
@@ -1232,6 +1291,17 @@ function SearchLost({ onNavigate }: PageProps) {
           </div>
         )}
       </div>
+
+      {/* Image Modal */}
+      <ImageModal
+        isOpen={imageModal.isOpen}
+        onClose={closeImageModal}
+        imageUrl={imageModal.imageUrl}
+        alt={imageModal.alt}
+        images={imageModal.images}
+        currentIndex={imageModal.currentIndex}
+        onNavigate={navigateImage}
+      />
     </div>
   );
 }
