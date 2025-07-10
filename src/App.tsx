@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { discService, imageService, ReturnStatus, Source, supabaseService } from './lib/supabase';
+import { discService, imageService, ReturnStatus, Source, supabaseService, DiscCondition, DiscType } from './lib/supabase';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ImageUpload } from './components/ImageUpload';
 import { ReturnStatusManager } from './components/ReturnStatusManager';
@@ -374,10 +374,10 @@ function ReportFound({ onNavigate }: PageProps) {
         finder_id: user!.id, // Use authenticated user's ID
         brand: formData.brand || 'not specified',
         mold: formData.mold || undefined,
-        disc_type: formData.discType || undefined,
+        disc_type: (formData.discType as DiscType) || undefined,
         color: formData.color || 'not specified',
         weight: formData.weight ? parseInt(formData.weight) : undefined,
-        condition: formData.condition || undefined,
+        condition: (formData.condition as DiscCondition) || undefined,
         plastic_type: formData.plasticType || undefined,
         stamp_text: formData.stampText || undefined,
         phone_number: formData.phoneNumber || undefined,
