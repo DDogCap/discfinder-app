@@ -43,7 +43,7 @@ function isSMSConfigured() {
   return !!(TEXTMAGIC_USERNAME && TEXTMAGIC_API_KEY);
 }
 
-async function sendFoundDiscNotification(phoneNumber, messageTemplate, foundDiscId, sourceId) {
+async function sendFoundDiscNotification(phoneNumber, messageTemplate, foundDiscId, sourceId, rackId) {
   if (!messageTemplate || messageTemplate.trim() === '') {
     return { success: false, error: 'No message template available for this source' };
   }
@@ -51,11 +51,19 @@ async function sendFoundDiscNotification(phoneNumber, messageTemplate, foundDisc
   if (!phoneValidation.isValid) {
     return { success: false, error: phoneValidation.error, phoneNumber };
   }
+
+  // Append rack_id to the message if available
+  let finalMessage = messageTemplate.trim();
+  if (rackId) {
+    finalMessage += ` #${rackId}`;
+  }
+
   // Simulate successful SMS
   return {
     success: true,
     messageId: `sim_${Date.now()}`,
-    phoneNumber: phoneValidation.normalizedPhone
+    phoneNumber: phoneValidation.normalizedPhone,
+    finalMessage: finalMessage // Include final message for testing
   };
 }
 
@@ -99,18 +107,21 @@ async function testSMSFunctionality() {
   const testPhone = '(555) 123-4567';
   
   try {
+    const testRackId = 2345;
     const result = await sendFoundDiscNotification(
       testPhone,
       testMessage,
       'test-disc-id',
-      'test-source-id'
+      'test-source-id',
+      testRackId
     );
-    
+
     if (result.success) {
       console.log(`   ✅ SMS would be sent successfully`);
       console.log(`   📱 To: ${result.phoneNumber}`);
       console.log(`   📨 Message ID: ${result.messageId}`);
-      console.log(`   💬 Message: ${testMessage.substring(0, 100)}...`);
+      console.log(`   💬 Final Message: ${result.finalMessage}`);
+      console.log(`   🏷️  Rack ID appended: #${testRackId}`);
     } else {
       console.log(`   ❌ SMS sending failed: ${result.error}`);
     }
@@ -126,9 +137,10 @@ async function testSMSFunctionality() {
       testPhone,
       '', // Empty message
       'test-disc-id',
-      'test-source-id'
+      'test-source-id',
+      1234 // Test rack ID
     );
-    
+
     if (!result.success) {
       console.log(`   ✅ Correctly rejected empty message: ${result.error}`);
     } else {

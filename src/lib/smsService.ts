@@ -138,13 +138,14 @@ export async function sendSMS(smsMessage: SMSMessage): Promise<SMSResult> {
 
 /**
  * Send found disc notification SMS
- * Uses the source's message template if available
+ * Uses the source's message template if available and appends rack_id
  */
 export async function sendFoundDiscNotification(
   phoneNumber: string,
   messageTemplate: string | null | undefined,
   foundDiscId: string,
-  sourceId: string
+  sourceId: string,
+  rackId?: number
 ): Promise<SMSResult> {
   // Don't send if no message template
   if (!messageTemplate || messageTemplate.trim() === '') {
@@ -154,9 +155,15 @@ export async function sendFoundDiscNotification(
     };
   }
 
+  // Append rack_id to the message if available
+  let finalMessage = messageTemplate.trim();
+  if (rackId) {
+    finalMessage += ` #${rackId}`;
+  }
+
   const smsMessage: SMSMessage = {
     to: phoneNumber,
-    message: messageTemplate.trim(),
+    message: finalMessage,
     foundDiscId,
     sourceId
   };

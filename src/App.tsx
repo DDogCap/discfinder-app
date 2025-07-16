@@ -421,7 +421,8 @@ function ReportFound({ onNavigate }: PageProps) {
                   phoneValidation.normalizedPhone,
                   selectedSource.msg1_found_just_entered,
                   data.id,
-                  formData.sourceId
+                  formData.sourceId,
+                  data.rack_id
                 );
 
                 if (smsResult.success) {
@@ -429,11 +430,17 @@ function ReportFound({ onNavigate }: PageProps) {
 
                   // Log the SMS in contact attempts
                   try {
+                    // Create the final message with rack_id for logging
+                    let finalMessageForLog = selectedSource.msg1_found_just_entered;
+                    if (data.rack_id) {
+                      finalMessageForLog += ` #${data.rack_id}`;
+                    }
+
                     const contactAttempt = {
                       found_disc_id: data.id,
                       attempted_at: new Date().toISOString(),
                       contact_method: 'SMS',
-                      message_content: selectedSource.msg1_found_just_entered,
+                      message_content: finalMessageForLog,
                       attempted_by_profile_id: user!.id,
                       attempted_by_name: user!.email || 'System',
                       response_received: false,
