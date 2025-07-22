@@ -838,6 +838,11 @@ function SearchLost({ onNavigate }: PageProps) {
   const [resultsPerPage, setResultsPerPage] = useState(50);
   const [showAllResults, setShowAllResults] = useState(false);
 
+  // Sorting and filtering state
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc'>('newest');
+  const [minRackId, setMinRackId] = useState('');
+  const [maxRackId, setMaxRackId] = useState('');
+
   // Image modal state
   const [imageModal, setImageModal] = useState<{
     isOpen: boolean;
@@ -906,7 +911,15 @@ function SearchLost({ onNavigate }: PageProps) {
         ? { fetchAll: true }
         : { limit: resultsPerPage, offset, fetchAll: false };
 
-      const result = await discService.searchFoundDiscsWithQuery(searchQuery, options);
+      // Add sorting and filtering options
+      const searchOptions = {
+        ...options,
+        sortBy,
+        minRackId: minRackId ? parseInt(minRackId) : undefined,
+        maxRackId: maxRackId ? parseInt(maxRackId) : undefined
+      };
+
+      const result = await discService.searchFoundDiscsWithQuery(searchQuery, searchOptions);
 
       if (result.error) {
         console.error('Search error:', result.error);
@@ -947,7 +960,15 @@ function SearchLost({ onNavigate }: PageProps) {
         ? { fetchAll: true }
         : { limit: resultsPerPage, offset, fetchAll: false };
 
-      const result = await discService.getFoundDiscs(options);
+      // Add sorting and filtering options
+      const loadOptions = {
+        ...options,
+        sortBy,
+        minRackId: minRackId ? parseInt(minRackId) : undefined,
+        maxRackId: maxRackId ? parseInt(maxRackId) : undefined
+      };
+
+      const result = await discService.getFoundDiscs(loadOptions);
 
       if (result.error) {
         console.error('Load error:', result.error);
@@ -988,6 +1009,27 @@ function SearchLost({ onNavigate }: PageProps) {
     setShowAllResults(!showAllResults);
     setCurrentPage(1);
     // Re-run the current search/load with new setting
+    if (searchQuery.trim()) {
+      handleSearch(null as any, 1);
+    } else if (hasSearched) {
+      loadAllDiscs(1);
+    }
+  };
+
+  const handleSortChange = (newSortBy: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc') => {
+    setSortBy(newSortBy);
+    setCurrentPage(1);
+    // Re-run the current search/load with new sorting
+    if (searchQuery.trim()) {
+      handleSearch(null as any, 1);
+    } else if (hasSearched) {
+      loadAllDiscs(1);
+    }
+  };
+
+  const handleFilterChange = () => {
+    setCurrentPage(1);
+    // Re-run the current search/load with new filters
     if (searchQuery.trim()) {
       handleSearch(null as any, 1);
     } else if (hasSearched) {
@@ -1042,6 +1084,100 @@ function SearchLost({ onNavigate }: PageProps) {
             </button>
           </div>
         </form>
+
+        {/* Sorting and Filtering Controls */}
+        <div className="search-controls" style={{
+          marginTop: '20px',
+          padding: '16px',
+          backgroundColor: '#f8f9fa',
+          borderRadius: '8px',
+          border: '1px solid #e9ecef'
+        }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
+            {/* Sort Options */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <label style={{ fontWeight: '500', fontSize: '14px' }}>Sort by:</label>
+              <select
+                value={sortBy}
+                onChange={(e) => handleSortChange(e.target.value as any)}
+                disabled={isSearching}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: '4px',
+                  border: '1px solid #ccc',
+                  fontSize: '14px'
+                }}
+              >
+                <option value="newest">Newest First</option>
+                <option value="oldest">Oldest First</option>
+                <option value="rack_id_asc">Rack ID (Low to High)</option>
+                <option value="rack_id_desc">Rack ID (High to Low)</option>
+              </select>
+            </div>
+
+            {/* Admin-only Rack ID Filters */}
+            {userRole === 'admin' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <label style={{ fontWeight: '500', fontSize: '14px' }}>Filter by Rack ID:</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <input
+                    type="number"
+                    placeholder="Min"
+                    value={minRackId}
+                    onChange={(e) => setMinRackId(e.target.value)}
+                    onBlur={handleFilterChange}
+                    disabled={isSearching}
+                    style={{
+                      width: '80px',
+                      padding: '6px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid #ccc',
+                      fontSize: '14px'
+                    }}
+                  />
+                  <span style={{ fontSize: '14px', color: '#666' }}>to</span>
+                  <input
+                    type="number"
+                    placeholder="Max"
+                    value={maxRackId}
+                    onChange={(e) => setMaxRackId(e.target.value)}
+                    onBlur={handleFilterChange}
+                    disabled={isSearching}
+                    style={{
+                      width: '80px',
+                      padding: '6px 8px',
+                      borderRadius: '4px',
+                      border: '1px solid #ccc',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+                {(minRackId || maxRackId) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMinRackId('');
+                      setMaxRackId('');
+                      handleFilterChange();
+                    }}
+                    disabled={isSearching}
+                    style={{
+                      padding: '4px 8px',
+                      fontSize: '12px',
+                      backgroundColor: '#dc3545',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
 
         {hasSearched && (
           <div className="search-results">

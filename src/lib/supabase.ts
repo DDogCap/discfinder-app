@@ -227,17 +227,42 @@ export const discService = {
   async getFoundDiscs(options: {
     limit?: number;
     offset?: number;
-    fetchAll?: boolean
+    fetchAll?: boolean;
+    sortBy?: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc';
+    minRackId?: number;
+    maxRackId?: number;
   } = {}) {
     try {
-      const { limit = 1000, offset = 0, fetchAll = true } = options;
+      const { limit = 1000, offset = 0, fetchAll = true, sortBy = 'newest', minRackId, maxRackId } = options;
 
       if (fetchAll) {
         // Fetch all records using chunking
-        return await this.getAllFoundDiscsChunked();
+        const result = await this.getAllFoundDiscsChunked();
+        if (result.data) {
+          // Apply client-side filtering and sorting
+          let filteredData = result.data;
+
+          // Apply rack ID filters
+          if (minRackId !== undefined) {
+            filteredData = filteredData.filter(disc => disc.rack_id && disc.rack_id >= minRackId);
+          }
+          if (maxRackId !== undefined) {
+            filteredData = filteredData.filter(disc => disc.rack_id && disc.rack_id <= maxRackId);
+          }
+
+          // Apply sorting
+          filteredData = this.sortFoundDiscs(filteredData, sortBy);
+
+          return {
+            ...result,
+            data: filteredData,
+            count: filteredData.length
+          };
+        }
+        return result;
       } else {
         // Fetch specific page
-        return await this.getFoundDiscsPage(limit, offset);
+        return await this.getFoundDiscsPage(limit, offset, sortBy, minRackId, maxRackId);
       }
     } catch (error) {
       console.error('Error fetching found discs:', error)
@@ -245,24 +270,85 @@ export const discService = {
     }
   },
 
+  // Helper method to sort found discs
+  sortFoundDiscs(discs: FoundDisc[], sortBy: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc'): FoundDisc[] {
+    return [...discs].sort((a, b) => {
+      switch (sortBy) {
+        case 'oldest':
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        case 'rack_id_asc':
+          return (a.rack_id || 0) - (b.rack_id || 0);
+        case 'rack_id_desc':
+          return (b.rack_id || 0) - (a.rack_id || 0);
+        case 'newest':
+        default:
+          return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      }
+    });
+  },
+
   // Get a specific page of found discs
-  async getFoundDiscsPage(limit: number = 50, offset: number = 0) {
+  async getFoundDiscsPage(limit: number = 50, offset: number = 0, sortBy: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc' = 'newest', minRackId?: number, maxRackId?: number) {
     try {
+      // Determine sort order
+      let orderColumn = 'created_at';
+      let ascending = false;
+
+      switch (sortBy) {
+        case 'oldest':
+          orderColumn = 'created_at';
+          ascending = true;
+          break;
+        case 'rack_id_asc':
+          orderColumn = 'rack_id';
+          ascending = true;
+          break;
+        case 'rack_id_desc':
+          orderColumn = 'rack_id';
+          ascending = false;
+          break;
+        case 'newest':
+        default:
+          orderColumn = 'created_at';
+          ascending = false;
+          break;
+      }
+
       // Try the public view first, fallback to main table
-      let { data, error, count } = await supabase
+      let query = supabase
         .from('public_found_discs')
-        .select('*', { count: 'exact' })
-        .order('created_at', { ascending: false })
-        .range(offset, offset + limit - 1)
+        .select('*', { count: 'exact' });
+
+      // Apply rack ID filters
+      if (minRackId !== undefined) {
+        query = query.gte('rack_id', minRackId);
+      }
+      if (maxRackId !== undefined) {
+        query = query.lte('rack_id', maxRackId);
+      }
+
+      let { data, error, count } = await query
+        .order(orderColumn, { ascending })
+        .range(offset, offset + limit - 1);
 
       // If public view doesn't exist or doesn't have image_urls, use main table
       if (error || (data && data.length > 0 && !data[0].hasOwnProperty('image_urls'))) {
         console.log('Using main table instead of view');
-        const result = await supabase
+        let mainQuery = supabase
           .from('found_discs')
           .select('*', { count: 'exact' })
-          .eq('status', 'active')
-          .order('created_at', { ascending: false })
+          .eq('status', 'active');
+
+        // Apply rack ID filters
+        if (minRackId !== undefined) {
+          mainQuery = mainQuery.gte('rack_id', minRackId);
+        }
+        if (maxRackId !== undefined) {
+          mainQuery = mainQuery.lte('rack_id', maxRackId);
+        }
+
+        const result = await mainQuery
+          .order(orderColumn, { ascending })
           .range(offset, offset + limit - 1);
 
         data = result.data;
@@ -522,7 +608,10 @@ export const discService = {
   async searchFoundDiscsWithQuery(searchQuery: string, options: {
     limit?: number;
     offset?: number;
-    fetchAll?: boolean
+    fetchAll?: boolean;
+    sortBy?: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc';
+    minRackId?: number;
+    maxRackId?: number;
   } = {}) {
     try {
       if (!searchQuery || searchQuery.trim() === '') {
@@ -530,7 +619,7 @@ export const discService = {
         return this.getFoundDiscs(options);
       }
 
-      const { limit = 1000, offset = 0, fetchAll = true } = options;
+      const { limit = 1000, offset = 0, fetchAll = true, sortBy = 'newest', minRackId, maxRackId } = options;
 
       // For simple single-term searches, use server-side filtering for better performance
       const searchTerms = searchQuery.trim().toLowerCase().split(/\s+/);
@@ -541,9 +630,31 @@ export const discService = {
       } else {
         // Multi-term search - still need client-side filtering for complex logic
         if (fetchAll) {
-          return await this.searchFoundDiscsMultiTermChunked(searchTerms);
+          const result = await this.searchFoundDiscsMultiTermChunked(searchTerms);
+          if (result.data) {
+            // Apply client-side filtering and sorting
+            let filteredData = result.data;
+
+            // Apply rack ID filters
+            if (minRackId !== undefined) {
+              filteredData = filteredData.filter(disc => disc.rack_id && disc.rack_id >= minRackId);
+            }
+            if (maxRackId !== undefined) {
+              filteredData = filteredData.filter(disc => disc.rack_id && disc.rack_id <= maxRackId);
+            }
+
+            // Apply sorting
+            filteredData = this.sortFoundDiscs(filteredData, sortBy);
+
+            return {
+              ...result,
+              data: filteredData,
+              count: filteredData.length
+            };
+          }
+          return result;
         } else {
-          return await this.searchFoundDiscsMultiTermPaginated(searchTerms, limit, offset);
+          return await this.searchFoundDiscsMultiTermPaginated(searchTerms, limit, offset, sortBy, minRackId, maxRackId);
         }
       }
     } catch (error) {
@@ -556,17 +667,42 @@ export const discService = {
   async searchFoundDiscsSingleTerm(term: string, options: {
     limit?: number;
     offset?: number;
-    fetchAll?: boolean
+    fetchAll?: boolean;
+    sortBy?: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc';
+    minRackId?: number;
+    maxRackId?: number;
   } = {}) {
     try {
-      const { limit = 1000, offset = 0, fetchAll = true } = options;
+      const { limit = 1000, offset = 0, fetchAll = true, sortBy = 'newest', minRackId, maxRackId } = options;
 
       if (fetchAll) {
         // Fetch all matching records using chunking
-        return await this.searchFoundDiscsSingleTermChunked(term);
+        const result = await this.searchFoundDiscsSingleTermChunked(term);
+        if (result.data) {
+          // Apply client-side filtering and sorting
+          let filteredData = result.data;
+
+          // Apply rack ID filters
+          if (minRackId !== undefined) {
+            filteredData = filteredData.filter(disc => disc.rack_id && disc.rack_id >= minRackId);
+          }
+          if (maxRackId !== undefined) {
+            filteredData = filteredData.filter(disc => disc.rack_id && disc.rack_id <= maxRackId);
+          }
+
+          // Apply sorting
+          filteredData = this.sortFoundDiscs(filteredData, sortBy);
+
+          return {
+            ...result,
+            data: filteredData,
+            count: filteredData.length
+          };
+        }
+        return result;
       } else {
         // Fetch specific page
-        return await this.searchFoundDiscsSingleTermPage(term, limit, offset);
+        return await this.searchFoundDiscsSingleTermPage(term, limit, offset, sortBy, minRackId, maxRackId);
       }
     } catch (error) {
       console.error('Error in single term search:', error);
@@ -575,7 +711,7 @@ export const discService = {
   },
 
   // Single-term search with pagination - optimized for rack_id searches
-  async searchFoundDiscsSingleTermPage(term: string, limit: number, offset: number) {
+  async searchFoundDiscsSingleTermPage(term: string, limit: number, offset: number, sortBy: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc' = 'newest', minRackId?: number, maxRackId?: number) {
     try {
       const lowerTerm = term.toLowerCase();
       const rackIdNum = parseInt(term);
@@ -775,12 +911,12 @@ export const discService = {
   },
 
   // Multi-term search with pagination (still needs client-side filtering)
-  async searchFoundDiscsMultiTermPaginated(searchTerms: string[], limit: number, offset: number) {
+  async searchFoundDiscsMultiTermPaginated(searchTerms: string[], limit: number, offset: number, sortBy: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc' = 'newest', minRackId?: number, maxRackId?: number) {
     try {
       // For multi-term searches, we need to get a larger dataset and filter client-side
       // Get more records than requested to account for filtering
       const fetchLimit = Math.max(limit * 3, 1000); // Get 3x more records to account for filtering
-      const { data: allDiscs, error: fetchError } = await this.getFoundDiscsPage(fetchLimit, 0);
+      const { data: allDiscs, error: fetchError } = await this.getFoundDiscsPage(fetchLimit, 0, sortBy, minRackId, maxRackId);
 
       if (fetchError) {
         throw fetchError;
@@ -791,7 +927,7 @@ export const discService = {
       }
 
       // Filter discs that match all search terms
-      const filteredDiscs = allDiscs.filter(disc => {
+      let filteredDiscs = allDiscs.filter(disc => {
         return searchTerms.every(term => {
           const lowerTerm = term.toLowerCase();
 
@@ -818,6 +954,17 @@ export const discService = {
           return matchesText || matchesRackId;
         });
       });
+
+      // Apply rack ID filters
+      if (minRackId !== undefined) {
+        filteredDiscs = filteredDiscs.filter(disc => disc.rack_id && disc.rack_id >= minRackId);
+      }
+      if (maxRackId !== undefined) {
+        filteredDiscs = filteredDiscs.filter(disc => disc.rack_id && disc.rack_id <= maxRackId);
+      }
+
+      // Apply sorting
+      filteredDiscs = this.sortFoundDiscs(filteredDiscs, sortBy);
 
       // Apply pagination to filtered results
       const paginatedResults = filteredDiscs.slice(offset, offset + limit);
