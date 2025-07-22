@@ -28,7 +28,7 @@ export interface Profile {
   default_source_id?: string
 }
 
-export type ReturnStatus = 'Found' | 'Returned to Owner' | 'Donated' | 'Sold' | 'Trashed';
+export type ReturnStatus = 'Found' | 'Returned to Owner' | 'Donated' | 'Sold' | 'Trashed' | 'For Sale Used';
 
 export interface ContactAttempt {
   id: string;

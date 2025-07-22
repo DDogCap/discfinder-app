@@ -26,6 +26,7 @@ export const ReturnStatusManager: React.FC<ReturnStatusManagerProps> = ({
     'Returned to Owner',
     'Donated',
     'Sold',
+    'For Sale Used',
     'Trashed'
   ];
 
@@ -35,6 +36,7 @@ export const ReturnStatusManager: React.FC<ReturnStatusManagerProps> = ({
       case 'Returned to Owner': return '#3b82f6'; // blue
       case 'Donated': return '#8b5cf6'; // purple
       case 'Sold': return '#f59e0b'; // amber
+      case 'For Sale Used': return '#06b6d4'; // cyan
       case 'Trashed': return '#ef4444'; // red
       default: return '#6b7280'; // gray
     }
