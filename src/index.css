@@ -249,6 +249,38 @@
     @apply w-full px-3 py-2 border border-gray-300 rounded-md text-sm transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
   }
 
+  /* Mobile form improvements */
+  @media (max-width: 768px) {
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      @apply text-base min-h-[44px] py-3;
+    }
+
+    .form-group input[type="text"],
+    .form-group input[type="email"],
+    .form-group input[type="tel"] {
+      @apply text-base;
+    }
+
+    /* Ensure buttons are touch-friendly */
+    .button,
+    .hero-button,
+    .nav-button {
+      @apply min-h-[44px] px-4 py-3 text-base;
+    }
+
+    /* Prevent zoom on input focus */
+    input[type="text"],
+    input[type="email"],
+    input[type="tel"],
+    input[type="search"],
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+  }
+
   .form-group textarea {
     @apply resize-y min-h-[100px];
   }
