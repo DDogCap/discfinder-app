@@ -84,6 +84,55 @@
     @apply bg-white text-blue-600 border-2 border-blue-600 hover:bg-blue-50 shadow-lg hover:shadow-xl;
   }
 
+  /* Recent Discs Section */
+  .recent-discs-section {
+    @apply mt-12 lg:mt-16 max-w-7xl mx-auto;
+  }
+
+  .recent-discs-section h2 {
+    @apply text-2xl lg:text-3xl font-bold text-gray-900 mb-6 text-center;
+  }
+
+  .loading-message {
+    @apply text-center text-gray-600 py-8;
+  }
+
+  .no-results {
+    @apply text-center text-gray-600 py-8;
+  }
+
+  .disc-details {
+    @apply space-y-2 text-sm text-gray-600 mb-4;
+  }
+
+  .disc-details p {
+    @apply mb-1;
+  }
+
+  .disc-details strong {
+    @apply font-medium text-gray-800;
+  }
+
+  .disc-images {
+    @apply grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4;
+  }
+
+  .disc-image {
+    @apply w-full h-24 sm:h-32 object-cover rounded border border-gray-200;
+  }
+
+  .more-images {
+    @apply flex items-center justify-center bg-gray-100 text-gray-600 text-xs font-medium rounded border border-gray-200 h-24 sm:h-32;
+  }
+
+  .view-all-container {
+    @apply text-center mt-8;
+  }
+
+  .view-all-button {
+    @apply px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-colors duration-200 shadow-md hover:shadow-lg;
+  }
+
   /* Features Section */
   .features {
     @apply grid grid-cols-1 lg:grid-cols-3 gap-8 py-12 lg:py-16;

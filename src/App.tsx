@@ -195,6 +195,49 @@ function AdminDashboard({ onNavigate }: PageProps) {
 }
 
 function Home({ onNavigate }: PageProps) {
+  const { userRole } = useAuth();
+  const [recentDiscs, setRecentDiscs] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const loadRecentDiscs = async () => {
+      setIsLoading(true);
+      try {
+        // Fetch 24 most recent found discs with status 'Found'
+        const result = await discService.getFoundDiscs({
+          limit: 24,
+          offset: 0,
+          fetchAll: false,
+          sortBy: 'newest'
+        });
+
+        if (result.error) {
+          console.error('Error loading recent discs:', result.error);
+          setRecentDiscs([]);
+        } else {
+          setRecentDiscs(result.data || []);
+        }
+      } catch (error) {
+        console.error('Failed to load recent discs:', error);
+        setRecentDiscs([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadRecentDiscs();
+  }, []);
+
+  const handleReturnStatusUpdate = (discId: string, newStatus: string) => {
+    setRecentDiscs(prevDiscs =>
+      prevDiscs.map(disc =>
+        disc.id === discId
+          ? { ...disc, return_status: newStatus }
+          : disc
+      ).filter(disc => disc.return_status === 'Found') // Remove discs that are no longer 'Found'
+    );
+  };
+
   return (
     <div>
       <div className="hero">
@@ -215,6 +258,88 @@ function Home({ onNavigate }: PageProps) {
         </div>
       </div>
 
+      {/* Recent Found Discs Section */}
+      <div className="recent-discs-section">
+        <h2 className="text-2xl font-bold text-gray-900 mb-4">Recently Found Discs</h2>
+
+        {isLoading ? (
+          <div className="loading-message">Loading recent discs...</div>
+        ) : recentDiscs.length === 0 ? (
+          <div className="no-results">No found discs available at this time.</div>
+        ) : (
+          <div className="disc-grid">
+            {recentDiscs.map((disc) => (
+              <div key={disc.id} className="disc-card">
+                <div className="disc-header">
+                  <h4>
+                    {disc.rack_id && `#${disc.rack_id} `}
+                    {disc.brand && disc.brand.toLowerCase() !== 'not specified' ? `${disc.brand} ` : ''}
+                    {disc.mold || 'Unknown Mold'}
+                  </h4>
+                </div>
+
+                {/* Return Status - only show for admin or if not 'Found' */}
+                {(userRole === 'admin' || (disc.return_status && disc.return_status !== 'Found')) && (
+                  <ReturnStatusManager
+                    discId={disc.id}
+                    currentStatus={disc.return_status || 'Found'}
+                    onStatusUpdated={(newStatus) => handleReturnStatusUpdate(disc.id, newStatus)}
+                    disabled={userRole !== 'admin'}
+                  />
+                )}
+
+                {/* Disc Details */}
+                <div className="disc-details">
+                  {disc.color && disc.color.toLowerCase() !== 'not specified' && (
+                    <p><strong>Color:</strong> {disc.color}</p>
+                  )}
+                  {disc.condition && disc.condition.toLowerCase() !== 'not specified' && (
+                    <p><strong>Condition:</strong> {disc.condition}</p>
+                  )}
+                  {disc.location_found && (
+                    <p><strong>Found at:</strong> {disc.location_found}</p>
+                  )}
+                  {disc.found_date && (
+                    <p><strong>Found:</strong> {new Date(disc.found_date).toLocaleDateString()}</p>
+                  )}
+                  {disc.source_name && (
+                    <p><strong>Source:</strong> {disc.source_name}</p>
+                  )}
+                </div>
+
+                {/* Images */}
+                {disc.image_urls && disc.image_urls.length > 0 && (
+                  <div className="disc-images">
+                    {disc.image_urls.slice(0, 3).map((url: string, index: number) => (
+                      <img
+                        key={index}
+                        src={url}
+                        alt={`Disc ${index + 1}`}
+                        className="disc-image"
+                        loading="lazy"
+                      />
+                    ))}
+                    {disc.image_urls.length > 3 && (
+                      <div className="more-images">+{disc.image_urls.length - 3} more</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {recentDiscs.length > 0 && (
+          <div className="view-all-container">
+            <button
+              className="view-all-button"
+              onClick={() => onNavigate('search-lost')}
+            >
+              View All Found Discs
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
