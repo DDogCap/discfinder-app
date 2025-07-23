@@ -610,6 +610,63 @@ function ReportFound({ onNavigate }: PageProps) {
           />
         </div>
 
+        {/* SMS Preview */}
+        {formData.phoneNumber &&
+         formData.sourceId &&
+         validatePhoneForSMS(formData.phoneNumber).isValid &&
+         userRole === 'admin' && (
+          <div className="sms-preview" style={{
+            backgroundColor: '#f8f9fa',
+            border: '1px solid #dee2e6',
+            borderRadius: '8px',
+            padding: '16px',
+            margin: '16px 0',
+            fontSize: '14px'
+          }}>
+            <div style={{
+              fontWeight: 'bold',
+              marginBottom: '8px',
+              color: '#495057',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}>
+              📱 Text Message Preview
+            </div>
+            <div style={{
+              backgroundColor: '#ffffff',
+              border: '1px solid #e9ecef',
+              borderRadius: '4px',
+              padding: '12px',
+              fontFamily: 'monospace',
+              fontSize: '13px',
+              lineHeight: '1.4',
+              color: '#212529'
+            }}>
+              {(() => {
+                const selectedSource = sources.find(s => s.id === formData.sourceId);
+                if (!selectedSource?.msg1_found_just_entered) {
+                  return <em style={{ color: '#6c757d' }}>No message template available for this source</em>;
+                }
+
+                // Show the message with a placeholder rack ID since we don't have the actual one yet
+                const messageTemplate = selectedSource.msg1_found_just_entered.trim();
+                const previewMessage = `${messageTemplate} #XXXX`;
+
+                return previewMessage;
+              })()}
+            </div>
+            <div style={{
+              fontSize: '12px',
+              color: '#6c757d',
+              marginTop: '8px',
+              fontStyle: 'italic'
+            }}>
+              * The actual rack number (#XXXX) will be assigned when the disc is saved
+            </div>
+          </div>
+        )}
+
         {/* Quick Report Button */}
         <div className="form-actions quick-report">
           <button
@@ -794,30 +851,89 @@ function ReportFound({ onNavigate }: PageProps) {
 
         {/* Final Form Actions - Only show when additional details are expanded */}
         {showAdditionalDetails && (
-          <div className="form-actions final-actions">
-            <button
-              type="button"
-              className="button secondary"
-              onClick={() => onNavigate('home')}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="button primary"
-              disabled={isSubmitting || userRole !== 'admin'}
-            >
-              {isSubmitting
-                ? 'Submitting...'
-                : userRole !== 'admin'
-                  ? 'Admin Access Required'
-                  : formData.phoneNumber && validatePhoneForSMS(formData.phoneNumber).isValid
-                    ? 'Report Found Disc and Send Text Message'
-                    : 'Report Found Disc'
-              }
-            </button>
-          </div>
+          <>
+            {/* SMS Preview for expanded form */}
+            {formData.phoneNumber &&
+             formData.sourceId &&
+             validatePhoneForSMS(formData.phoneNumber).isValid &&
+             userRole === 'admin' && (
+              <div className="sms-preview" style={{
+                backgroundColor: '#f8f9fa',
+                border: '1px solid #dee2e6',
+                borderRadius: '8px',
+                padding: '16px',
+                margin: '16px 0',
+                fontSize: '14px'
+              }}>
+                <div style={{
+                  fontWeight: 'bold',
+                  marginBottom: '8px',
+                  color: '#495057',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px'
+                }}>
+                  📱 Text Message Preview
+                </div>
+                <div style={{
+                  backgroundColor: '#ffffff',
+                  border: '1px solid #e9ecef',
+                  borderRadius: '4px',
+                  padding: '12px',
+                  fontFamily: 'monospace',
+                  fontSize: '13px',
+                  lineHeight: '1.4',
+                  color: '#212529'
+                }}>
+                  {(() => {
+                    const selectedSource = sources.find(s => s.id === formData.sourceId);
+                    if (!selectedSource?.msg1_found_just_entered) {
+                      return <em style={{ color: '#6c757d' }}>No message template available for this source</em>;
+                    }
+
+                    // Show the message with a placeholder rack ID since we don't have the actual one yet
+                    const messageTemplate = selectedSource.msg1_found_just_entered.trim();
+                    const previewMessage = `${messageTemplate} #XXXX`;
+
+                    return previewMessage;
+                  })()}
+                </div>
+                <div style={{
+                  fontSize: '12px',
+                  color: '#6c757d',
+                  marginTop: '8px',
+                  fontStyle: 'italic'
+                }}>
+                  * The actual rack number (#XXXX) will be assigned when the disc is saved
+                </div>
+              </div>
+            )}
+
+            <div className="form-actions final-actions">
+              <button
+                type="button"
+                className="button secondary"
+                onClick={() => onNavigate('home')}
+                disabled={isSubmitting}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="button primary"
+                disabled={isSubmitting || userRole !== 'admin'}
+              >
+                {isSubmitting
+                  ? 'Submitting...'
+                  : userRole !== 'admin'
+                    ? 'Admin Access Required'
+                    : formData.phoneNumber && validatePhoneForSMS(formData.phoneNumber).isValid
+                      ? 'Report Found Disc and Send Text Message'
+                      : 'Report Found Disc'
+                }
+              </button>
+            </div>
+          </>
         )}
       </form>
     </div>
