@@ -314,7 +314,7 @@ export const discService = {
           break;
       }
 
-      // Try the public view first, fallback to main table
+      // Try the public view first (no status filter needed - view already filters for active discs)
       let query = supabase
         .from('public_found_discs')
         .select('*', { count: 'exact' });
@@ -331,9 +331,9 @@ export const discService = {
         .order(orderColumn, { ascending })
         .range(offset, offset + limit - 1);
 
-      // If public view doesn't exist or doesn't have image_urls, use main table
-      if (error || (data && data.length > 0 && !data[0].hasOwnProperty('image_urls'))) {
-        console.log('Using main table instead of view');
+      // If public view query fails, use main table with status filter
+      if (error) {
+        console.log('Public view failed, using main table instead:', error.message);
         let mainQuery = supabase
           .from('found_discs')
           .select('*', { count: 'exact' })
@@ -471,7 +471,7 @@ export const discService = {
     rackId?: string
   }, limit: number = 50, offset: number = 0) {
     try {
-      // Try the public view first, fallback to main table
+      // Try the public view first (no status filter needed - view already filters for active discs)
       let query = supabase
         .from('public_found_discs')
         .select('*', { count: 'exact' })
@@ -502,9 +502,9 @@ export const discService = {
         .order('created_at', { ascending: false })
         .range(offset, offset + limit - 1)
 
-      // If public view doesn't exist or doesn't have image_urls, use main table
-      if (error || (data && data.length > 0 && !data[0].hasOwnProperty('image_urls'))) {
-        console.log('Using main table for search instead of view');
+      // If public view query fails, use main table with status filter
+      if (error) {
+        console.log('Public view search failed, using main table instead:', error.message);
         let mainQuery = supabase
           .from('found_discs')
           .select('*', { count: 'exact' })
