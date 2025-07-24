@@ -13,7 +13,6 @@ import SourceManager from './components/SourceManager';
 import { sendFoundDiscNotification, validatePhoneForSMS } from './lib/smsService';
 import OptimizedImage from './components/OptimizedImage';
 import ImageModal from './components/ImageModal';
-import MobileDebugInfo from './components/MobileDebugInfo';
 
 
 type Page = 'home' | 'report-found' | 'search-lost' | 'login' | 'admin' | 'rakerdiver' | 'admin-bulk-turnins' | 'profile-import' | 'profile' | 'photo-migration';
@@ -23,7 +22,6 @@ function AppContent() {
   const { user, userRole, signOut, loading } = useAuth();
 
   const handleNavigate = (page: string) => {
-    console.log('Navigation requested:', page, 'Current user:', user?.email, 'Role:', userRole);
     setCurrentPage(page as Page);
   };
 
@@ -48,7 +46,6 @@ function AppContent() {
       case 'photo-migration':
         return <PhotoMigrationManager />;
       case 'profile':
-        console.log('Rendering profile page, user:', user?.email, 'userId:', user?.id);
         return user ? <ProfileManager userId={user.id} /> : <Login onNavigate={setCurrentPage} />;
       default:
         return <Home onNavigate={setCurrentPage} />;
@@ -87,13 +84,7 @@ function AppContent() {
                 <span className="user-info text-xs text-gray-600 px-2 py-1 bg-gray-100 rounded hidden sm:inline">
                   {user.email} ({userRole})
                 </span>
-                <button
-                  className="nav-button px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
-                  onClick={() => {
-                    console.log('Profile button clicked, user:', user?.email, 'userRole:', userRole);
-                    setCurrentPage('profile');
-                  }}
-                >
+                <button className="nav-button px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors" onClick={() => setCurrentPage('profile')}>
                   Profile
                 </button>
                 {userRole === 'admin' && (
@@ -130,7 +121,6 @@ function AppContent() {
       <main className="main-container">
         {renderPage()}
       </main>
-      <MobileDebugInfo />
     </div>
   );
 }

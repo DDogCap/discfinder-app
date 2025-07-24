@@ -36,8 +36,6 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({ userId, onProfileUpdate
   const loadProfile = async () => {
     try {
       setIsLoading(true);
-      console.log('ProfileManager: Loading profile for user:', userId);
-
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
@@ -45,11 +43,9 @@ const ProfileManager: React.FC<ProfileManagerProps> = ({ userId, onProfileUpdate
         .single();
 
       if (error) {
-        console.error('ProfileManager: Error loading profile:', error);
         throw error;
       }
 
-      console.log('ProfileManager: Profile loaded successfully:', data);
       setProfile(data);
       setFormData({
         full_name: data.full_name || '',
