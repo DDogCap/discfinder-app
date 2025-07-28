@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { discService, imageService, ReturnStatus, Source, supabaseService, DiscCondition, DiscType } from './lib/supabase';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ImageUpload } from './components/ImageUpload';
@@ -15,7 +15,7 @@ import OptimizedImage from './components/OptimizedImage';
 import ImageModal from './components/ImageModal';
 
 
-type Page = 'home' | 'report-found' | 'search-lost' | 'login' | 'admin' | 'rakerdiver' | 'admin-bulk-turnins' | 'profile-import' | 'profile' | 'photo-migration';
+type Page = 'home' | 'report-found' | 'login' | 'admin' | 'rakerdiver' | 'admin-bulk-turnins' | 'profile-import' | 'profile' | 'photo-migration';
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
@@ -31,8 +31,7 @@ function AppContent() {
         return <Home onNavigate={setCurrentPage} />;
       case 'report-found':
         return <ReportFound onNavigate={setCurrentPage} />;
-      case 'search-lost':
-        return <SearchLost onNavigate={setCurrentPage} />;
+
       case 'login':
         return <Login onNavigate={setCurrentPage} />;
       case 'admin':
@@ -199,6 +198,42 @@ function Home({ onNavigate }: PageProps) {
   const [recentDiscs, setRecentDiscs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Search functionality state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [foundDiscs, setFoundDiscs] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [resultsPerPage, setResultsPerPage] = useState(50);
+  const [showAllResults, setShowAllResults] = useState(false);
+
+  // Sorting and filtering state
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc'>('newest');
+  const [minRackId, setMinRackId] = useState('');
+  const [maxRackId, setMaxRackId] = useState('');
+
+  // Image modal state
+  const [imageModal, setImageModal] = useState<{
+    isOpen: boolean;
+    imageUrl: string;
+    alt: string;
+    images: string[];
+    currentIndex: number;
+  }>({
+    isOpen: false,
+    imageUrl: '',
+    alt: '',
+    images: [],
+    currentIndex: 0
+  });
+
+  // Debounce timer ref
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     const loadRecentDiscs = async () => {
       setIsLoading(true);
@@ -225,10 +260,14 @@ function Home({ onNavigate }: PageProps) {
       }
     };
 
-    loadRecentDiscs();
-  }, []);
+    // Only load recent discs if no search is active
+    if (!hasSearched) {
+      loadRecentDiscs();
+    }
+  }, [hasSearched]);
 
   const handleReturnStatusUpdate = (discId: string, newStatus: string) => {
+    // Update both recent discs and search results
     setRecentDiscs(prevDiscs =>
       prevDiscs.map(disc =>
         disc.id === discId
@@ -236,7 +275,158 @@ function Home({ onNavigate }: PageProps) {
           : disc
       ).filter(disc => disc.return_status === 'Found') // Remove discs that are no longer 'Found'
     );
+
+    setFoundDiscs(prevDiscs =>
+      prevDiscs.map(disc =>
+        disc.id === discId
+          ? { ...disc, return_status: newStatus, returned_at: new Date().toISOString() }
+          : disc
+      )
+    );
   };
+
+  // Image modal functions
+  const openImageModal = (imageUrl: string, alt: string, allImages: string[], index: number) => {
+    setImageModal({
+      isOpen: true,
+      imageUrl,
+      alt,
+      images: allImages,
+      currentIndex: index
+    });
+  };
+
+  const closeImageModal = () => {
+    setImageModal(prev => ({ ...prev, isOpen: false }));
+  };
+
+  const navigateImage = (direction: 'prev' | 'next') => {
+    setImageModal(prev => {
+      const newIndex = direction === 'prev'
+        ? Math.max(0, prev.currentIndex - 1)
+        : Math.min(prev.images.length - 1, prev.currentIndex + 1);
+
+      return {
+        ...prev,
+        currentIndex: newIndex,
+        imageUrl: prev.images[newIndex]
+      };
+    });
+  };
+
+  // Search functionality
+  const performSearch = async (query: string, page: number = 1) => {
+    setIsSearching(true);
+    setHasSearched(true);
+    setCurrentPage(page);
+
+    try {
+      const offset = (page - 1) * resultsPerPage;
+      const options = showAllResults
+        ? { fetchAll: true }
+        : { limit: resultsPerPage, offset, fetchAll: false };
+
+      // Add sorting and filtering options
+      const searchOptions = {
+        ...options,
+        sortBy,
+        minRackId: minRackId ? parseInt(minRackId) : undefined,
+        maxRackId: maxRackId ? parseInt(maxRackId) : undefined
+      };
+
+      const result = await discService.searchFoundDiscsWithQuery(query, searchOptions);
+
+      if (result.error) {
+        console.error('Search error:', result.error);
+        setFoundDiscs([]);
+        setTotalCount(0);
+        setHasMore(false);
+      } else {
+        console.log('Search results:', result.data);
+        setFoundDiscs(result.data || []);
+
+        if (showAllResults) {
+          setTotalCount(result.data?.length || 0);
+          setHasMore(false);
+        } else {
+          setTotalCount('count' in result ? result.count || 0 : 0);
+          setHasMore('hasMore' in result ? result.hasMore || false : false);
+        }
+      }
+    } catch (error) {
+      console.error('Search failed:', error);
+      setFoundDiscs([]);
+      setTotalCount(0);
+      setHasMore(false);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Debounced search function
+  const debouncedSearch = (query: string) => {
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      if (query.trim()) {
+        performSearch(query.trim());
+      } else {
+        // Clear search results and show recent discs
+        setFoundDiscs([]);
+        setHasSearched(false);
+        setTotalCount(0);
+        setHasMore(false);
+        setCurrentPage(1);
+      }
+    }, 400); // 400ms debounce delay
+  };
+
+  // Handle search input change
+  const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    debouncedSearch(query);
+  };
+
+  // Clear search
+  const clearSearch = () => {
+    setSearchQuery('');
+    setFoundDiscs([]);
+    setHasSearched(false);
+    setTotalCount(0);
+    setHasMore(false);
+    setCurrentPage(1);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+  };
+
+  // Pagination functions
+  const handlePageChange = (newPage: number) => {
+    if (searchQuery.trim()) {
+      performSearch(searchQuery.trim(), newPage);
+    }
+  };
+
+  const toggleShowAllResults = () => {
+    setShowAllResults(!showAllResults);
+    setCurrentPage(1);
+    // Re-run the current search with new setting
+    if (searchQuery.trim()) {
+      performSearch(searchQuery.trim(), 1);
+    }
+  };
+
+  // Cleanup debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div>
@@ -248,98 +438,379 @@ function Home({ onNavigate }: PageProps) {
           The DZDiscFinder helps disc golf players reunite with their lost discs, report found discs, or search for your lost discs in our database.
         </p>
 
-        <div className="hero-buttons">
-          <button className="hero-button secondary" onClick={() => onNavigate('search-lost')}>
-            Search Found Discs
-          </button>
-          <button className="hero-button primary" onClick={() => onNavigate('report-found')}>
-            Report Found Disc
-          </button>
+        {/* Search Bar */}
+        <div className="hero-search">
+          <div className="search-input-container">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={handleSearchInputChange}
+              placeholder="Search by brand, mold, color, rack ID, location, or any other details (e.g., 'Innova Blue Trespass', 'Hole 7', '417')"
+              className="hero-search-input"
+              autoFocus
+            />
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
+                className="clear-search-button"
+                type="button"
+                aria-label="Clear search"
+              >
+                ×
+              </button>
+            )}
+          </div>
+          <p className="search-help-text">
+            Enter multiple search terms separated by spaces. Each term will be searched across all disc fields.
+          </p>
+
+          {/* Report Found Disc Button */}
+          <div className="report-found-container">
+            <button className="hero-button primary" onClick={() => onNavigate('report-found')}>
+              Report Found Disc
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Recent Found Discs Section */}
-      <div className="recent-discs-section">
-        <h2 className="text-2xl font-bold text-gray-900 mb-4">Recently Found Discs</h2>
+      {/* Conditional Content: Search Results or Recent Discs */}
+      {hasSearched ? (
+        /* Search Results Section */
+        <div className="search-results">
+          <div className="search-results-header">
+            <h3>
+              {isSearching ? (
+                'Searching...'
+              ) : foundDiscs.length > 0 ? (
+                showAllResults
+                  ? `Found ${foundDiscs.length} disc${foundDiscs.length === 1 ? '' : 's'} (showing all)`
+                  : `Found ${foundDiscs.length} disc${foundDiscs.length === 1 ? '' : 's'} (page ${currentPage}${totalCount > 0 ? ` of ${Math.ceil(totalCount / resultsPerPage)}` : ''})`
+              ) : (
+                'No discs found matching your criteria'
+              )}
+            </h3>
 
-        {isLoading ? (
-          <div className="loading-message">Loading recent discs...</div>
-        ) : recentDiscs.length === 0 ? (
-          <div className="no-results">No found discs available at this time.</div>
-        ) : (
-          <div className="disc-grid">
-            {recentDiscs.map((disc) => (
-              <div key={disc.id} className="disc-card">
-                <div className="disc-header">
-                  <h4>
-                    {disc.rack_id && `#${disc.rack_id} `}
-                    {disc.brand && disc.brand.toLowerCase() !== 'not specified' ? `${disc.brand} ` : ''}
-                    {disc.mold || 'Unknown Mold'}
-                  </h4>
+            {foundDiscs.length > 0 && (
+              <div className="search-options">
+                <div className="pagination-options">
+                  <label>
+                    <input
+                      type="checkbox"
+                      checked={showAllResults}
+                      onChange={toggleShowAllResults}
+                      disabled={isSearching}
+                    />
+                    Show all results (may be slow for large datasets)
+                  </label>
+
+                  {!showAllResults && (
+                    <select
+                      value={resultsPerPage}
+                      onChange={(e) => {
+                        setResultsPerPage(Number(e.target.value));
+                        setCurrentPage(1);
+                        if (searchQuery.trim()) {
+                          performSearch(searchQuery.trim(), 1);
+                        }
+                      }}
+                      disabled={isSearching}
+                    >
+                      <option value={25}>25 per page</option>
+                      <option value={50}>50 per page</option>
+                      <option value={100}>100 per page</option>
+                    </select>
+                  )}
                 </div>
 
-                {/* Return Status - only show for admin or if not 'Found' */}
-                {(userRole === 'admin' || (disc.return_status && disc.return_status !== 'Found')) && (
-                  <ReturnStatusManager
-                    discId={disc.id}
-                    currentStatus={disc.return_status || 'Found'}
-                    onStatusUpdated={(newStatus) => handleReturnStatusUpdate(disc.id, newStatus)}
-                    disabled={userRole !== 'admin'}
-                  />
-                )}
-
-                {/* Disc Details */}
-                <div className="disc-details">
-                  {disc.color && disc.color.toLowerCase() !== 'not specified' && (
-                    <p><strong>Color:</strong> {disc.color}</p>
-                  )}
-                  {disc.condition && disc.condition.toLowerCase() !== 'not specified' && (
-                    <p><strong>Condition:</strong> {disc.condition}</p>
-                  )}
-                  {disc.location_found && (
-                    <p><strong>Found at:</strong> {disc.location_found}</p>
-                  )}
-                  {disc.found_date && (
-                    <p><strong>Found:</strong> {new Date(disc.found_date).toLocaleDateString()}</p>
-                  )}
-                  {disc.source_name && (
-                    <p><strong>Source:</strong> {disc.source_name}</p>
-                  )}
-                </div>
-
-                {/* Images */}
-                {disc.image_urls && disc.image_urls.length > 0 && (
-                  <div className="disc-images">
-                    {disc.image_urls.slice(0, 3).map((url: string, index: number) => (
-                      <img
-                        key={index}
-                        src={url}
-                        alt={`Disc ${index + 1}`}
-                        className="disc-image"
-                        loading="lazy"
-                      />
-                    ))}
-                    {disc.image_urls.length > 3 && (
-                      <div className="more-images">+{disc.image_urls.length - 3} more</div>
-                    )}
+                {totalCount > 0 && !showAllResults && (
+                  <div className="results-info">
+                    Showing {((currentPage - 1) * resultsPerPage) + 1}-{Math.min(currentPage * resultsPerPage, totalCount)} of {totalCount} total results
                   </div>
                 )}
               </div>
-            ))}
+            )}
           </div>
-        )}
 
-        {recentDiscs.length > 0 && (
-          <div className="view-all-container">
-            <button
-              className="view-all-button"
-              onClick={() => onNavigate('search-lost')}
-            >
-              View All Found Discs
-            </button>
-          </div>
-        )}
-      </div>
+          {foundDiscs.length > 0 && (
+            <div className="disc-grid">
+              {foundDiscs.map((disc) => (
+                <div key={disc.id} className="disc-card">
+                  <div className="disc-header">
+                    <h4>
+                      {disc.rack_id && `#${disc.rack_id} `}
+                      {disc.brand && disc.brand.toLowerCase() !== 'not specified' ? `${disc.brand} ` : ''}
+                      {disc.mold || 'Unknown Mold'}
+                    </h4>
+                  </div>
+
+                  {/* Return Status - only show for admin or if not 'Found' */}
+                  {(userRole === 'admin' || (disc.return_status && disc.return_status !== 'Found')) && (
+                    <ReturnStatusManager
+                      discId={disc.id}
+                      currentStatus={disc.return_status || 'Found'}
+                      onStatusUpdated={(newStatus) => handleReturnStatusUpdate(disc.id, newStatus)}
+                      disabled={userRole !== 'admin'}
+                    />
+                  )}
+
+                  {disc.image_urls && disc.image_urls.length > 0 && (
+                    <div className="disc-images">
+                      {disc.image_urls.slice(0, 2).map((imageUrl: string, index: number) => (
+                        <OptimizedImage
+                          key={index}
+                          src={imageUrl}
+                          alt={`${disc.brand} ${disc.mold || 'disc'} ${index + 1}`}
+                          className="disc-image"
+                          thumbnail={true}
+                          onClick={() => openImageModal(
+                            imageUrl,
+                            `${disc.brand} ${disc.mold || 'disc'} ${index + 1}`,
+                            disc.image_urls,
+                            index
+                          )}
+                        />
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="disc-details">
+                    {disc.color && (
+                      <div className="detail-row">
+                        <span className="label">Color:</span>
+                        <span className="value">{disc.color}</span>
+                      </div>
+                    )}
+
+                    {disc.weight && (
+                      <div className="detail-row">
+                        <span className="label">Weight:</span>
+                        <span className="value">{disc.weight}g</span>
+                      </div>
+                    )}
+
+                    {disc.condition && disc.condition.toLowerCase() !== 'unknown' && disc.condition.toLowerCase() !== 'not specified' && (
+                      <div className="detail-row">
+                        <span className="label">Condition:</span>
+                        <span className="value">{disc.condition}</span>
+                      </div>
+                    )}
+
+                    {disc.source_name && (
+                      <div className="detail-row">
+                        <span className="label">Source:</span>
+                        <span className="value">{disc.source_name}</span>
+                      </div>
+                    )}
+
+                    {disc.location_found && disc.location_found.toLowerCase() !== 'exact location unknown.' && disc.location_found.toLowerCase() !== 'unknown' && (
+                      <div className="detail-row">
+                        <span className="label">Specific Location:</span>
+                        <span className="value">{disc.location_found}</span>
+                      </div>
+                    )}
+
+                    <div className="detail-row">
+                      <span className="label">Found on:</span>
+                      <span className="value">{new Date(disc.found_date).toLocaleDateString()}</span>
+                    </div>
+
+                    {disc.phone_number && (
+                      <div className="detail-row">
+                        <span className="label">Phone on disc:</span>
+                        <span className="value">{disc.phone_number}</span>
+                      </div>
+                    )}
+
+                    {disc.name_on_disc && (
+                      <div className="detail-row">
+                        <span className="label">Name on disc:</span>
+                        <span className="value">{disc.name_on_disc}</span>
+                      </div>
+                    )}
+
+                    {disc.description && (
+                      <div className="detail-row">
+                        <span className="label">Description:</span>
+                        <span className="value">{disc.description}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {foundDiscs.length > 0 && !showAllResults && totalCount > resultsPerPage && (
+            <div className="pagination-controls">
+              <button
+                className="button secondary"
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage <= 1 || isSearching}
+              >
+                ← Previous
+              </button>
+
+              <div className="page-numbers">
+                {(() => {
+                  const totalPages = Math.ceil(totalCount / resultsPerPage);
+                  const pages = [];
+                  const maxVisiblePages = 5;
+
+                  let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+                  // Adjust start if we're near the end
+                  if (endPage - startPage + 1 < maxVisiblePages) {
+                    startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                  }
+
+                  // Add first page and ellipsis if needed
+                  if (startPage > 1) {
+                    pages.push(
+                      <button
+                        key={1}
+                        className={`page-button ${1 === currentPage ? 'active' : ''}`}
+                        onClick={() => handlePageChange(1)}
+                        disabled={isSearching}
+                      >
+                        1
+                      </button>
+                    );
+                    if (startPage > 2) {
+                      pages.push(<span key="ellipsis1" className="page-ellipsis">...</span>);
+                    }
+                  }
+
+                  // Add visible page numbers
+                  for (let i = startPage; i <= endPage; i++) {
+                    pages.push(
+                      <button
+                        key={i}
+                        className={`page-button ${i === currentPage ? 'active' : ''}`}
+                        onClick={() => handlePageChange(i)}
+                        disabled={isSearching}
+                      >
+                        {i}
+                      </button>
+                    );
+                  }
+
+                  // Add last page and ellipsis if needed
+                  if (endPage < totalPages) {
+                    if (endPage < totalPages - 1) {
+                      pages.push(<span key="ellipsis2" className="page-ellipsis">...</span>);
+                    }
+                    pages.push(
+                      <button
+                        key={totalPages}
+                        className={`page-button ${totalPages === currentPage ? 'active' : ''}`}
+                        onClick={() => handlePageChange(totalPages)}
+                        disabled={isSearching}
+                      >
+                        {totalPages}
+                      </button>
+                    );
+                  }
+
+                  return pages;
+                })()}
+              </div>
+
+              <button
+                className="button secondary"
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={!hasMore || isSearching}
+              >
+                Next →
+              </button>
+            </div>
+          )}
+        </div>
+      ) : (
+        /* Recent Found Discs Section */
+        <div className="recent-discs-section">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Recently Found Discs</h2>
+
+          {isLoading ? (
+            <div className="loading-message">Loading recent discs...</div>
+          ) : recentDiscs.length === 0 ? (
+            <div className="no-results">No found discs available at this time.</div>
+          ) : (
+            <div className="disc-grid">
+              {recentDiscs.map((disc) => (
+                <div key={disc.id} className="disc-card">
+                  <div className="disc-header">
+                    <h4>
+                      {disc.rack_id && `#${disc.rack_id} `}
+                      {disc.brand && disc.brand.toLowerCase() !== 'not specified' ? `${disc.brand} ` : ''}
+                      {disc.mold || 'Unknown Mold'}
+                    </h4>
+                  </div>
+
+                  {/* Return Status - only show for admin or if not 'Found' */}
+                  {(userRole === 'admin' || (disc.return_status && disc.return_status !== 'Found')) && (
+                    <ReturnStatusManager
+                      discId={disc.id}
+                      currentStatus={disc.return_status || 'Found'}
+                      onStatusUpdated={(newStatus) => handleReturnStatusUpdate(disc.id, newStatus)}
+                      disabled={userRole !== 'admin'}
+                    />
+                  )}
+
+                  {/* Disc Details */}
+                  <div className="disc-details">
+                    {disc.color && disc.color.toLowerCase() !== 'not specified' && (
+                      <p><strong>Color:</strong> {disc.color}</p>
+                    )}
+                    {disc.condition && disc.condition.toLowerCase() !== 'not specified' && (
+                      <p><strong>Condition:</strong> {disc.condition}</p>
+                    )}
+                    {disc.location_found && (
+                      <p><strong>Found at:</strong> {disc.location_found}</p>
+                    )}
+                    {disc.found_date && (
+                      <p><strong>Found:</strong> {new Date(disc.found_date).toLocaleDateString()}</p>
+                    )}
+                    {disc.source_name && (
+                      <p><strong>Source:</strong> {disc.source_name}</p>
+                    )}
+                  </div>
+
+                  {/* Images */}
+                  {disc.image_urls && disc.image_urls.length > 0 && (
+                    <div className="disc-images">
+                      {disc.image_urls.slice(0, 3).map((url: string, index: number) => (
+                        <img
+                          key={index}
+                          src={url}
+                          alt={`Disc ${index + 1}`}
+                          className="disc-image"
+                          loading="lazy"
+                        />
+                      ))}
+                      {disc.image_urls.length > 3 && (
+                        <div className="more-images">+{disc.image_urls.length - 3} more</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Image Modal */}
+      <ImageModal
+        isOpen={imageModal.isOpen}
+        onClose={closeImageModal}
+        imageUrl={imageModal.imageUrl}
+        alt={imageModal.alt}
+        images={imageModal.images}
+        currentIndex={imageModal.currentIndex}
+        onNavigate={navigateImage}
+      />
     </div>
   );
 }
@@ -1065,630 +1536,10 @@ function ReportFound({ onNavigate }: PageProps) {
   );
 }
 
-function SearchLost({ onNavigate }: PageProps) {
-  const { userRole } = useAuth();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [foundDiscs, setFoundDiscs] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
-
-  // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalCount, setTotalCount] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
-  const [resultsPerPage, setResultsPerPage] = useState(50);
-  const [showAllResults, setShowAllResults] = useState(false);
-
-  // Sorting and filtering state
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc'>('newest');
-  const [minRackId, setMinRackId] = useState('');
-  const [maxRackId, setMaxRackId] = useState('');
-
-  // Image modal state
-  const [imageModal, setImageModal] = useState<{
-    isOpen: boolean;
-    imageUrl: string;
-    alt: string;
-    images: string[];
-    currentIndex: number;
-  }>({
-    isOpen: false,
-    imageUrl: '',
-    alt: '',
-    images: [],
-    currentIndex: 0
-  });
-
-  const handleReturnStatusUpdate = (discId: string, newStatus: ReturnStatus) => {
-    // Update the disc in the local state
-    setFoundDiscs(prev => prev.map(disc =>
-      disc.id === discId
-        ? { ...disc, return_status: newStatus, returned_at: new Date().toISOString() }
-        : disc
-    ));
-  };
-
-  const openImageModal = (imageUrl: string, alt: string, allImages: string[], index: number) => {
-    setImageModal({
-      isOpen: true,
-      imageUrl,
-      alt,
-      images: allImages,
-      currentIndex: index
-    });
-  };
-
-  const closeImageModal = () => {
-    setImageModal(prev => ({ ...prev, isOpen: false }));
-  };
-
-  const navigateImage = (direction: 'prev' | 'next') => {
-    setImageModal(prev => {
-      const newIndex = direction === 'prev'
-        ? Math.max(0, prev.currentIndex - 1)
-        : Math.min(prev.images.length - 1, prev.currentIndex + 1);
-
-      return {
-        ...prev,
-        currentIndex: newIndex,
-        imageUrl: prev.images[newIndex]
-      };
-    });
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-  };
-
-  const handleSearch = async (e: React.FormEvent, page: number = 1) => {
-    if (e) e.preventDefault();
-    setIsSearching(true);
-    setHasSearched(true);
-    setCurrentPage(page);
-
-    try {
-      const offset = (page - 1) * resultsPerPage;
-      const options = showAllResults
-        ? { fetchAll: true }
-        : { limit: resultsPerPage, offset, fetchAll: false };
-
-      // Add sorting and filtering options
-      const searchOptions = {
-        ...options,
-        sortBy,
-        minRackId: minRackId ? parseInt(minRackId) : undefined,
-        maxRackId: maxRackId ? parseInt(maxRackId) : undefined
-      };
-
-      const result = await discService.searchFoundDiscsWithQuery(searchQuery, searchOptions);
-
-      if (result.error) {
-        console.error('Search error:', result.error);
-        setFoundDiscs([]);
-        setTotalCount(0);
-        setHasMore(false);
-      } else {
-        console.log('Search results:', result.data);
-        setFoundDiscs(result.data || []);
-
-        if (showAllResults) {
-          setTotalCount(result.data?.length || 0);
-          setHasMore(false);
-        } else {
-          setTotalCount('count' in result ? result.count || 0 : 0);
-          setHasMore('hasMore' in result ? result.hasMore || false : false);
-        }
-      }
-    } catch (error) {
-      console.error('Search failed:', error);
-      setFoundDiscs([]);
-      setTotalCount(0);
-      setHasMore(false);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const loadAllDiscs = async (page: number = 1) => {
-    setIsSearching(true);
-    setHasSearched(true);
-    setCurrentPage(page);
-    setSearchQuery(''); // Clear search query when loading all
-
-    try {
-      const offset = (page - 1) * resultsPerPage;
-      const options = showAllResults
-        ? { fetchAll: true }
-        : { limit: resultsPerPage, offset, fetchAll: false };
-
-      // Add sorting and filtering options
-      const loadOptions = {
-        ...options,
-        sortBy,
-        minRackId: minRackId ? parseInt(minRackId) : undefined,
-        maxRackId: maxRackId ? parseInt(maxRackId) : undefined
-      };
-
-      const result = await discService.getFoundDiscs(loadOptions);
-
-      if (result.error) {
-        console.error('Load error:', result.error);
-        setFoundDiscs([]);
-        setTotalCount(0);
-        setHasMore(false);
-      } else {
-        console.log('Load all results:', result.data);
-        setFoundDiscs(result.data || []);
-
-        if (showAllResults) {
-          setTotalCount(result.data?.length || 0);
-          setHasMore(false);
-        } else {
-          setTotalCount('count' in result ? result.count || 0 : 0);
-          setHasMore('hasMore' in result ? result.hasMore || false : false);
-        }
-      }
-    } catch (error) {
-      console.error('Load failed:', error);
-      setFoundDiscs([]);
-      setTotalCount(0);
-      setHasMore(false);
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
-  const handlePageChange = (newPage: number) => {
-    if (searchQuery.trim()) {
-      handleSearch(null as any, newPage);
-    } else {
-      loadAllDiscs(newPage);
-    }
-  };
-
-  const toggleShowAllResults = () => {
-    setShowAllResults(!showAllResults);
-    setCurrentPage(1);
-    // Re-run the current search/load with new setting
-    if (searchQuery.trim()) {
-      handleSearch(null as any, 1);
-    } else if (hasSearched) {
-      loadAllDiscs(1);
-    }
-  };
-
-  const handleSortChange = (newSortBy: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc') => {
-    setSortBy(newSortBy);
-    setCurrentPage(1);
-    // Re-run the current search/load with new sorting
-    if (searchQuery.trim()) {
-      handleSearch(null as any, 1);
-    } else if (hasSearched) {
-      loadAllDiscs(1);
-    }
-  };
-
-  const handleFilterChange = () => {
-    setCurrentPage(1);
-    // Re-run the current search/load with new filters
-    if (searchQuery.trim()) {
-      handleSearch(null as any, 1);
-    } else if (hasSearched) {
-      loadAllDiscs(1);
-    }
-  };
-
-  return (
-    <div className="page-container">
-      <div className="page-header">
-        <button className="back-button" onClick={() => onNavigate('home')}>
-          ← Back to Home
-        </button>
-        <h1>Search Found Discs</h1>
-        <p>Search through reported found discs to see if someone has found your lost disc.</p>
-      </div>
-
-      <div className="search-container">
-        <form className="search-form" onSubmit={handleSearch}>
-          <div className="search-section">
-            <div className="form-group">
-              <input
-                type="text"
-                id="search-query"
-                name="searchQuery"
-                value={searchQuery}
-                onChange={handleInputChange}
-                placeholder="Search by brand, mold, color, rack ID, location, or any other details (e.g., 'Innova Blue Trespass', 'Hole 7', '417')"
-                style={{ width: '100%', padding: '12px', fontSize: '16px' }}
-              />
-              <p style={{ fontSize: '14px', color: '#666', marginTop: '8px' }}>
-                Enter multiple search terms separated by spaces. Each term will be searched across all disc fields.
-              </p>
-            </div>
-          </div>
-
-          <div className="search-actions">
-            <button
-              type="button"
-              className="button secondary"
-              onClick={() => loadAllDiscs()}
-              disabled={isSearching}
-            >
-              {isSearching ? 'Loading...' : 'Show All Found Discs'}
-            </button>
-            <button
-              type="submit"
-              className="button primary"
-              disabled={isSearching}
-            >
-              {isSearching ? 'Searching...' : 'Search'}
-            </button>
-          </div>
-        </form>
-
-        {/* Sorting and Filtering Controls */}
-        <div className="search-controls" style={{
-          marginTop: '20px',
-          padding: '16px',
-          backgroundColor: '#f8f9fa',
-          borderRadius: '8px',
-          border: '1px solid #e9ecef'
-        }}>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'center' }}>
-            {/* Sort Options */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <label style={{ fontWeight: '500', fontSize: '14px' }}>Sort by:</label>
-              <select
-                value={sortBy}
-                onChange={(e) => handleSortChange(e.target.value as any)}
-                disabled={isSearching}
-                style={{
-                  padding: '6px 12px',
-                  borderRadius: '4px',
-                  border: '1px solid #ccc',
-                  fontSize: '14px'
-                }}
-              >
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-                <option value="rack_id_asc">Rack ID (Low to High)</option>
-                <option value="rack_id_desc">Rack ID (High to Low)</option>
-              </select>
-            </div>
-
-            {/* Admin-only Rack ID Filters */}
-            {userRole === 'admin' && (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <label style={{ fontWeight: '500', fontSize: '14px' }}>Filter by Rack ID:</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <input
-                    type="number"
-                    placeholder="Min"
-                    value={minRackId}
-                    onChange={(e) => setMinRackId(e.target.value)}
-                    onBlur={handleFilterChange}
-                    disabled={isSearching}
-                    style={{
-                      width: '80px',
-                      padding: '6px 8px',
-                      borderRadius: '4px',
-                      border: '1px solid #ccc',
-                      fontSize: '14px'
-                    }}
-                  />
-                  <span style={{ fontSize: '14px', color: '#666' }}>to</span>
-                  <input
-                    type="number"
-                    placeholder="Max"
-                    value={maxRackId}
-                    onChange={(e) => setMaxRackId(e.target.value)}
-                    onBlur={handleFilterChange}
-                    disabled={isSearching}
-                    style={{
-                      width: '80px',
-                      padding: '6px 8px',
-                      borderRadius: '4px',
-                      border: '1px solid #ccc',
-                      fontSize: '14px'
-                    }}
-                  />
-                </div>
-                {(minRackId || maxRackId) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setMinRackId('');
-                      setMaxRackId('');
-                      handleFilterChange();
-                    }}
-                    disabled={isSearching}
-                    style={{
-                      padding: '4px 8px',
-                      fontSize: '12px',
-                      backgroundColor: '#dc3545',
-                      color: 'white',
-                      border: 'none',
-                      borderRadius: '4px',
-                      cursor: 'pointer'
-                    }}
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {hasSearched && (
-          <div className="search-results">
-            <div className="search-results-header">
-              <h3>
-                {foundDiscs.length > 0
-                  ? showAllResults
-                    ? `Found ${foundDiscs.length} disc${foundDiscs.length === 1 ? '' : 's'} (showing all)`
-                    : `Found ${foundDiscs.length} disc${foundDiscs.length === 1 ? '' : 's'} (page ${currentPage}${totalCount > 0 ? ` of ${Math.ceil(totalCount / resultsPerPage)}` : ''})`
-                  : 'No discs found matching your criteria'
-                }
-              </h3>
-
-              {foundDiscs.length > 0 && (
-                <div className="search-options">
-                  <div className="pagination-options">
-                    <label>
-                      <input
-                        type="checkbox"
-                        checked={showAllResults}
-                        onChange={toggleShowAllResults}
-                        disabled={isSearching}
-                      />
-                      Show all results (may be slow for large datasets)
-                    </label>
-
-                    {!showAllResults && (
-                      <select
-                        value={resultsPerPage}
-                        onChange={(e) => {
-                          setResultsPerPage(Number(e.target.value));
-                          setCurrentPage(1);
-                          if (searchQuery.trim()) {
-                            handleSearch(null as any, 1);
-                          } else {
-                            loadAllDiscs(1);
-                          }
-                        }}
-                        disabled={isSearching}
-                      >
-                        <option value={25}>25 per page</option>
-                        <option value={50}>50 per page</option>
-                        <option value={100}>100 per page</option>
-                      </select>
-                    )}
-                  </div>
-
-                  {totalCount > 0 && !showAllResults && (
-                    <div className="results-info">
-                      Showing {((currentPage - 1) * resultsPerPage) + 1}-{Math.min(currentPage * resultsPerPage, totalCount)} of {totalCount} total results
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-
-            {foundDiscs.length > 0 && (
-              <div className="disc-grid">
-                {foundDiscs.map((disc) => (
-                  <div key={disc.id} className="disc-card">
-                    <div className="disc-header">
-                      <h4>
-                        {disc.rack_id && `#${disc.rack_id} `}
-                        {disc.brand && disc.brand.toLowerCase() !== 'not specified' ? `${disc.brand} ` : ''}
-                        {disc.mold || 'Unknown Mold'}
-                      </h4>
-                    </div>
-
-                    {/* Return Status - only show for admin or if not 'Found' */}
-                    {(userRole === 'admin' || (disc.return_status && disc.return_status !== 'Found')) && (
-                      <ReturnStatusManager
-                        discId={disc.id}
-                        currentStatus={disc.return_status || 'Found'}
-                        onStatusUpdated={(newStatus) => handleReturnStatusUpdate(disc.id, newStatus)}
-                        disabled={userRole !== 'admin'}
-                      />
-                    )}
-
-                    {disc.image_urls && disc.image_urls.length > 0 && (
-                      <div className="disc-images">
-                        {disc.image_urls.slice(0, 2).map((imageUrl: string, index: number) => (
-                          <OptimizedImage
-                            key={index}
-                            src={imageUrl}
-                            alt={`${disc.brand} ${disc.mold || 'disc'} ${index + 1}`}
-                            className="disc-image"
-                            thumbnail={true}
-                            onClick={() => openImageModal(
-                              imageUrl,
-                              `${disc.brand} ${disc.mold || 'disc'} ${index + 1}`,
-                              disc.image_urls,
-                              index
-                            )}
-                          />
-                        ))}
-                      </div>
-                    )}
-
-                    <div className="disc-details">
-                      {disc.color && (
-                        <div className="detail-row">
-                          <span className="label">Color:</span>
-                          <span className="value">{disc.color}</span>
-                        </div>
-                      )}
-
-                      {disc.weight && (
-                        <div className="detail-row">
-                          <span className="label">Weight:</span>
-                          <span className="value">{disc.weight}g</span>
-                        </div>
-                      )}
-
-                      {disc.condition && disc.condition.toLowerCase() !== 'unknown' && disc.condition.toLowerCase() !== 'not specified' && (
-                        <div className="detail-row">
-                          <span className="label">Condition:</span>
-                          <span className="value">{disc.condition}</span>
-                        </div>
-                      )}
-
-                      {disc.source_name && (
-                        <div className="detail-row">
-                          <span className="label">Source:</span>
-                          <span className="value">{disc.source_name}</span>
-                        </div>
-                      )}
-
-                      {disc.location_found && disc.location_found.toLowerCase() !== 'exact location unknown.' && disc.location_found.toLowerCase() !== 'unknown' && (
-                        <div className="detail-row">
-                          <span className="label">Specific Location:</span>
-                          <span className="value">{disc.location_found}</span>
-                        </div>
-                      )}
-
-                      <div className="detail-row">
-                        <span className="label">Found on:</span>
-                        <span className="value">{new Date(disc.found_date).toLocaleDateString()}</span>
-                      </div>
-
-                      {disc.phone_number && (
-                        <div className="detail-row">
-                          <span className="label">Phone on disc:</span>
-                          <span className="value">{disc.phone_number}</span>
-                        </div>
-                      )}
-
-                      {disc.name_on_disc && (
-                        <div className="detail-row">
-                          <span className="label">Name on disc:</span>
-                          <span className="value">{disc.name_on_disc}</span>
-                        </div>
-                      )}
-
-                      {disc.description && (
-                        <div className="detail-row">
-                          <span className="label">Description:</span>
-                          <span className="value">{disc.description}</span>
-                        </div>
-                      )}
-                    </div>
 
 
-                  </div>
-                ))}
-              </div>
-            )}
 
-            {/* Pagination Controls */}
-            {foundDiscs.length > 0 && !showAllResults && totalCount > resultsPerPage && (
-                <div className="pagination-controls">
-                  <button
-                    className="button secondary"
-                    onClick={() => handlePageChange(currentPage - 1)}
-                    disabled={currentPage <= 1 || isSearching}
-                  >
-                    ← Previous
-                  </button>
 
-                  <div className="page-numbers">
-                    {(() => {
-                      const totalPages = Math.ceil(totalCount / resultsPerPage);
-                      const pages = [];
-                      const maxVisiblePages = 5;
-
-                      let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
-                      let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
-
-                      // Adjust start if we're near the end
-                      if (endPage - startPage + 1 < maxVisiblePages) {
-                        startPage = Math.max(1, endPage - maxVisiblePages + 1);
-                      }
-
-                      // Add first page and ellipsis if needed
-                      if (startPage > 1) {
-                        pages.push(
-                          <button
-                            key={1}
-                            className={`page-button ${1 === currentPage ? 'active' : ''}`}
-                            onClick={() => handlePageChange(1)}
-                            disabled={isSearching}
-                          >
-                            1
-                          </button>
-                        );
-                        if (startPage > 2) {
-                          pages.push(<span key="ellipsis1" className="page-ellipsis">...</span>);
-                        }
-                      }
-
-                      // Add visible page numbers
-                      for (let i = startPage; i <= endPage; i++) {
-                        pages.push(
-                          <button
-                            key={i}
-                            className={`page-button ${i === currentPage ? 'active' : ''}`}
-                            onClick={() => handlePageChange(i)}
-                            disabled={isSearching}
-                          >
-                            {i}
-                          </button>
-                        );
-                      }
-
-                      // Add last page and ellipsis if needed
-                      if (endPage < totalPages) {
-                        if (endPage < totalPages - 1) {
-                          pages.push(<span key="ellipsis2" className="page-ellipsis">...</span>);
-                        }
-                        pages.push(
-                          <button
-                            key={totalPages}
-                            className={`page-button ${totalPages === currentPage ? 'active' : ''}`}
-                            onClick={() => handlePageChange(totalPages)}
-                            disabled={isSearching}
-                          >
-                            {totalPages}
-                          </button>
-                        );
-                      }
-
-                      return pages;
-                    })()}
-                  </div>
-
-                  <button
-                    className="button secondary"
-                    onClick={() => handlePageChange(currentPage + 1)}
-                    disabled={!hasMore || isSearching}
-                  >
-                    Next →
-                  </button>
-                </div>
-              )}
-          </div>
-        )}
-      </div>
-
-      {/* Image Modal */}
-      <ImageModal
-        isOpen={imageModal.isOpen}
-        onClose={closeImageModal}
-        imageUrl={imageModal.imageUrl}
-        alt={imageModal.alt}
-        images={imageModal.images}
-        currentIndex={imageModal.currentIndex}
-        onNavigate={navigateImage}
-      />
-    </div>
-  );
-}
 
 function Login({ onNavigate }: PageProps) {
   const { signIn, signUp } = useAuth();
