@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { discService, imageService, ReturnStatus, Source, supabaseService, DiscCondition, DiscType } from './lib/supabase';
+import { discService, imageService, Source, supabaseService, DiscCondition, DiscType } from './lib/supabase';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ImageUpload } from './components/ImageUpload';
 import { ReturnStatusManager } from './components/ReturnStatusManager';
@@ -28,7 +28,7 @@ function AppContent() {
   const renderPage = () => {
     switch (currentPage) {
       case 'home':
-        return <Home onNavigate={setCurrentPage} />;
+        return <Home />;
       case 'report-found':
         return <ReportFound onNavigate={setCurrentPage} />;
 
@@ -47,7 +47,7 @@ function AppContent() {
       case 'profile':
         return user ? <ProfileManager userId={user.id} /> : <Login onNavigate={setCurrentPage} />;
       default:
-        return <Home onNavigate={setCurrentPage} />;
+        return <Home />;
     }
   };
 
@@ -78,6 +78,9 @@ function AppContent() {
             DZDiscFinder
           </div>
           <div className="nav-buttons flex items-center space-x-2 flex-wrap">
+            <button className="nav-button px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors" onClick={() => setCurrentPage('report-found')}>
+              Report Found Disc
+            </button>
             {user ? (
               <div className="user-menu flex items-center space-x-2 flex-wrap">
                 <span className="user-info text-xs text-gray-600 px-2 py-1 bg-gray-100 rounded hidden sm:inline">
@@ -193,7 +196,7 @@ function AdminDashboard({ onNavigate }: PageProps) {
   );
 }
 
-function Home({ onNavigate }: PageProps) {
+function Home() {
   const { userRole } = useAuth();
   const [recentDiscs, setRecentDiscs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -211,10 +214,7 @@ function Home({ onNavigate }: PageProps) {
   const [resultsPerPage, setResultsPerPage] = useState(50);
   const [showAllResults, setShowAllResults] = useState(false);
 
-  // Sorting and filtering state
-  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc'>('newest');
-  const [minRackId, setMinRackId] = useState('');
-  const [maxRackId, setMaxRackId] = useState('');
+
 
   // Image modal state
   const [imageModal, setImageModal] = useState<{
@@ -326,13 +326,7 @@ function Home({ onNavigate }: PageProps) {
         ? { fetchAll: true }
         : { limit: resultsPerPage, offset, fetchAll: false };
 
-      // Add sorting and filtering options
-      const searchOptions = {
-        ...options,
-        sortBy,
-        minRackId: minRackId ? parseInt(minRackId) : undefined,
-        maxRackId: maxRackId ? parseInt(maxRackId) : undefined
-      };
+      const searchOptions = options;
 
       const result = await discService.searchFoundDiscsWithQuery(query, searchOptions);
 
@@ -464,12 +458,7 @@ function Home({ onNavigate }: PageProps) {
             Enter multiple search terms separated by spaces. Each term will be searched across all disc fields.
           </p>
 
-          {/* Report Found Disc Button */}
-          <div className="report-found-container">
-            <button className="hero-button primary" onClick={() => onNavigate('report-found')}>
-              Report Found Disc
-            </button>
-          </div>
+
         </div>
       </div>
 
