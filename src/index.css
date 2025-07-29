@@ -511,6 +511,48 @@
     @apply block;
   }
 
+  /* FAQ Styles */
+  .faq-list {
+    @apply space-y-4;
+  }
+
+  .faq-item {
+    @apply bg-white rounded-lg shadow-md p-6 border border-gray-200;
+  }
+
+  .faq-item h3 {
+    @apply text-lg font-semibold text-gray-900 mb-3;
+  }
+
+  .faq-item .answer {
+    @apply text-gray-700 leading-relaxed;
+  }
+
+  /* FAQ Manager Styles */
+  .faq-form {
+    @apply bg-gray-50 p-4 rounded-lg mb-6;
+  }
+
+  .faq-form h3 {
+    @apply text-lg font-semibold mb-3;
+  }
+
+  .faq-edit-form {
+    @apply space-y-3;
+  }
+
+  .faq-actions {
+    @apply flex gap-2 mt-3;
+  }
+
+  .faq-answer {
+    @apply text-gray-600 mb-3 whitespace-pre-wrap;
+  }
+
+  .modal-content.large {
+    @apply max-w-4xl w-full max-h-[90vh] overflow-y-auto;
+  }
+
   /* Disc Detail Page Styles */
   .disc-detail-header {
     @apply mb-6 flex items-center gap-4;

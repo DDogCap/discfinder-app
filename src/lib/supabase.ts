@@ -254,6 +254,22 @@ export const discService = {
     }
   },
 
+  // Get all FAQs
+  async getFAQs() {
+    try {
+      const { data, error } = await supabase
+        .from('t_faq')
+        .select('*')
+        .order('id', { ascending: true });
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error fetching FAQs:', error);
+      return { data: null, error };
+    }
+  },
+
   // Get all active found discs with chunking to handle large datasets
   async getFoundDiscs(options: {
     limit?: number;

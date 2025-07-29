@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { discService, imageService, Source, supabaseService, DiscCondition, DiscType } from './lib/supabase';
+import { discService, imageService, Source, supabaseService, DiscCondition, DiscType, supabase } from './lib/supabase';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ImageUpload } from './components/ImageUpload';
 
@@ -15,7 +15,51 @@ import OptimizedImage from './components/OptimizedImage';
 import ImageModal from './components/ImageModal';
 
 
-type Page = 'home' | 'report-found' | 'login' | 'admin' | 'rakerdiver' | 'admin-bulk-turnins' | 'profile-import' | 'profile' | 'photo-migration' | 'disc-detail';
+type Page = 'home' | 'report-found' | 'login' | 'admin' | 'rakerdiver' | 'admin-bulk-turnins' | 'profile-import' | 'profile' | 'photo-migration' | 'disc-detail' | 'faq';
+
+// FAQ Component
+function FAQ() {
+  const [faqs, setFaqs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadFAQs = async () => {
+      setLoading(true);
+      const { data, error } = await discService.getFAQs();
+      if (data && !error) {
+        setFaqs(data);
+      } else {
+        console.error('Error loading FAQs:', error);
+      }
+      setLoading(false);
+    };
+
+    loadFAQs();
+  }, []);
+
+  return (
+    <div className="main-container">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">Frequently Asked Questions</h1>
+
+        {loading ? (
+          <div className="loading-message text-center py-8">Loading FAQs...</div>
+        ) : faqs.length === 0 ? (
+          <div className="no-results text-center py-8">No FAQs available at this time.</div>
+        ) : (
+          <div className="faq-list space-y-6">
+            {faqs.map((faq) => (
+              <div key={faq.id} className="faq-item bg-white rounded-lg shadow-md p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">{faq.question}</h3>
+                <div className="text-gray-700 whitespace-pre-wrap">{faq.answer}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
@@ -51,6 +95,8 @@ function AppContent() {
         return <PhotoMigrationManager />;
       case 'profile':
         return user ? <ProfileManager userId={user.id} /> : <Login onNavigate={setCurrentPage} />;
+      case 'faq':
+        return <FAQ />;
       default:
         return <Home onNavigate={handleNavigate} />;
     }
@@ -85,6 +131,9 @@ function AppContent() {
           <div className="nav-buttons flex items-center space-x-2 flex-wrap">
             <button className="nav-button px-3 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-md transition-colors" onClick={() => setCurrentPage('report-found')}>
               Report Found Disc
+            </button>
+            <button className="nav-button px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors" onClick={() => setCurrentPage('faq')}>
+              FAQ
             </button>
             {user ? (
               <div className="user-menu flex items-center space-x-2 flex-wrap">
@@ -144,9 +193,161 @@ interface PageProps {
   onNavigate: (page: Page) => void;
 }
 
+// FAQ Manager Component
+function FAQManager({ onClose }: { onClose: () => void }) {
+  const [faqs, setFaqs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [editingFaq, setEditingFaq] = useState<any>(null);
+  const [newFaq, setNewFaq] = useState({ question: '', answer: '' });
+
+  useEffect(() => {
+    loadFAQs();
+  }, []);
+
+  const loadFAQs = async () => {
+    setLoading(true);
+    const { data, error } = await discService.getFAQs();
+    if (data && !error) {
+      setFaqs(data);
+    } else {
+      console.error('Error loading FAQs:', error);
+    }
+    setLoading(false);
+  };
+
+  const handleSave = async (faq: any) => {
+    try {
+      if (faq.id) {
+        // Update existing FAQ
+        const { error } = await supabase
+          .from('t_faq')
+          .update({ question: faq.question, answer: faq.answer })
+          .eq('id', faq.id);
+
+        if (error) throw error;
+      } else {
+        // Create new FAQ
+        const { error } = await supabase
+          .from('t_faq')
+          .insert({ question: faq.question, answer: faq.answer });
+
+        if (error) throw error;
+      }
+
+      await loadFAQs();
+      setEditingFaq(null);
+      setNewFaq({ question: '', answer: '' });
+    } catch (error) {
+      console.error('Error saving FAQ:', error);
+      alert('Error saving FAQ. Please try again.');
+    }
+  };
+
+  const handleDelete = async (id: number) => {
+    if (!window.confirm('Are you sure you want to delete this FAQ?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('t_faq')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      await loadFAQs();
+    } catch (error) {
+      console.error('Error deleting FAQ:', error);
+      alert('Error deleting FAQ. Please try again.');
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content large" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2>Manage FAQs</h2>
+          <button className="modal-close" onClick={onClose}>×</button>
+        </div>
+
+        <div className="modal-body">
+          {/* Add New FAQ Form */}
+          <div className="faq-form">
+            <h3>Add New FAQ</h3>
+            <input
+              type="text"
+              placeholder="Question"
+              value={newFaq.question}
+              onChange={(e) => setNewFaq({ ...newFaq, question: e.target.value })}
+              className="form-input"
+            />
+            <textarea
+              placeholder="Answer"
+              value={newFaq.answer}
+              onChange={(e) => setNewFaq({ ...newFaq, answer: e.target.value })}
+              className="form-textarea"
+              rows={4}
+            />
+            <button
+              onClick={() => handleSave(newFaq)}
+              disabled={!newFaq.question.trim() || !newFaq.answer.trim()}
+              className="button primary"
+            >
+              Add FAQ
+            </button>
+          </div>
+
+          {/* Existing FAQs */}
+          <div className="faq-list">
+            <h3>Existing FAQs</h3>
+            {loading ? (
+              <div className="loading-message">Loading FAQs...</div>
+            ) : faqs.length === 0 ? (
+              <div className="no-results">No FAQs found.</div>
+            ) : (
+              faqs.map((faq) => (
+                <div key={faq.id} className="faq-item">
+                  {editingFaq?.id === faq.id ? (
+                    <div className="faq-edit-form">
+                      <input
+                        type="text"
+                        value={editingFaq.question}
+                        onChange={(e) => setEditingFaq({ ...editingFaq, question: e.target.value })}
+                        className="form-input"
+                      />
+                      <textarea
+                        value={editingFaq.answer}
+                        onChange={(e) => setEditingFaq({ ...editingFaq, answer: e.target.value })}
+                        className="form-textarea"
+                        rows={4}
+                      />
+                      <div className="faq-actions">
+                        <button onClick={() => handleSave(editingFaq)} className="button primary">Save</button>
+                        <button onClick={() => setEditingFaq(null)} className="button secondary">Cancel</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <h4>{faq.question}</h4>
+                      <p className="faq-answer">{faq.answer}</p>
+                      <div className="faq-actions">
+                        <button onClick={() => setEditingFaq(faq)} className="button secondary">Edit</button>
+                        <button onClick={() => handleDelete(faq.id)} className="button danger">Delete</button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminDashboard({ onNavigate }: PageProps) {
   const { userRole } = useAuth();
   const [showSourceManager, setShowSourceManager] = useState(false);
+  const [showFAQManager, setShowFAQManager] = useState(false);
 
   // Redirect if not admin
   if (userRole !== 'admin') {
@@ -187,6 +388,12 @@ function AdminDashboard({ onNavigate }: PageProps) {
         >
           Manage Sources
         </button>
+        <button
+          className="hero-button secondary"
+          onClick={() => setShowFAQManager(true)}
+        >
+          Manage FAQs
+        </button>
       </div>
 
 
@@ -196,6 +403,11 @@ function AdminDashboard({ onNavigate }: PageProps) {
       {/* Source Manager Modal */}
       {showSourceManager && (
         <SourceManager onClose={() => setShowSourceManager(false)} />
+      )}
+
+      {/* FAQ Manager Modal */}
+      {showFAQManager && (
+        <FAQManager onClose={() => setShowFAQManager(false)} />
       )}
     </div>
   );
