@@ -223,6 +223,37 @@ export const discService = {
     }
   },
 
+  // Get a single found disc by ID
+  async getFoundDiscById(discId: string) {
+    try {
+      // Try the public view first
+      let { data, error } = await supabase
+        .from('public_found_discs')
+        .select('*')
+        .eq('id', discId)
+        .single();
+
+      // If public view doesn't work, try main table
+      if (error || !data) {
+        const result = await supabase
+          .from('found_discs')
+          .select('*')
+          .eq('id', discId)
+          .eq('status', 'active')
+          .single();
+
+        data = result.data;
+        error = result.error;
+      }
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error fetching found disc by ID:', error);
+      return { data: null, error };
+    }
+  },
+
   // Get all active found discs with chunking to handle large datasets
   async getFoundDiscs(options: {
     limit?: number;

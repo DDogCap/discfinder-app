@@ -130,11 +130,11 @@
   }
 
   .disc-details {
-    @apply space-y-2 text-sm text-gray-600 mb-4;
+    @apply space-y-1 text-xs text-gray-600 mb-2;
   }
 
   .disc-details p {
-    @apply mb-1;
+    @apply mb-0;
   }
 
   .disc-details strong {
@@ -142,15 +142,15 @@
   }
 
   .disc-images {
-    @apply grid grid-cols-2 sm:grid-cols-3 gap-2 mt-4;
+    @apply grid grid-cols-1 gap-2 mt-2;
   }
 
   .disc-image {
-    @apply w-full h-24 sm:h-32 object-cover rounded border border-gray-200;
+    @apply w-full aspect-square object-cover rounded border border-gray-200 cursor-pointer;
   }
 
   .more-images {
-    @apply flex items-center justify-center bg-gray-100 text-gray-600 text-xs font-medium rounded border border-gray-200 h-24 sm:h-32;
+    @apply flex items-center justify-center bg-gray-100 text-gray-600 text-xs font-medium rounded border border-gray-200 h-24;
   }
 
   .view-all-container {
@@ -448,15 +448,19 @@
   }
 
   .disc-grid {
-    @apply grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4;
+    @apply grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-3;
   }
 
   .disc-card {
-    @apply bg-white rounded-2xl shadow-lg p-4 md:p-6 transition-shadow duration-200 hover:shadow-xl;
+    @apply bg-white rounded-2xl shadow-lg p-3 transition-shadow duration-200 hover:shadow-xl;
   }
 
   .disc-header {
-    @apply mb-4 pb-4 border-b border-gray-200;
+    @apply mb-2;
+  }
+
+  .disc-subheader {
+    @apply mb-3 text-sm text-gray-600 font-medium;
   }
 
   .disc-meta {
@@ -464,15 +468,104 @@
   }
 
   .disc-header h4 {
-    @apply text-lg font-semibold text-gray-900 m-0;
+    @apply text-sm font-semibold text-gray-900 m-0 leading-tight cursor-pointer hover:text-blue-600 transition-colors truncate;
   }
 
   .disc-images {
-    @apply flex gap-2 mb-4 pb-4 border-b border-gray-200;
+    @apply flex gap-2 mb-2 relative;
   }
 
   .disc-image {
-    @apply w-24 h-24 lg:w-32 lg:h-32 object-cover rounded-md border border-gray-200 bg-gray-50;
+    @apply w-full aspect-square object-cover rounded-md border border-gray-200 bg-gray-50 cursor-pointer;
+  }
+
+  .image-menu-container {
+    @apply relative;
+  }
+
+  .image-menu-button {
+    @apply absolute top-2 right-2 bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full p-1 shadow-sm cursor-pointer transition-all;
+  }
+
+  .image-menu-dropdown {
+    @apply absolute top-8 right-0 bg-white border border-gray-200 rounded-md shadow-lg py-1 z-10 min-w-[120px];
+  }
+
+  .image-menu-item {
+    @apply px-3 py-2 text-sm text-gray-700 hover:bg-gray-100 cursor-pointer block w-full text-left;
+  }
+
+  .image-menu {
+    @apply absolute top-2 right-2 z-10;
+  }
+
+  .image-menu-button {
+    @apply bg-white bg-opacity-80 hover:bg-opacity-100 rounded-full w-8 h-8 flex items-center justify-center text-gray-700 hover:text-gray-900 shadow-sm border border-gray-200 transition-all;
+  }
+
+  .image-menu-dropdown {
+    @apply absolute top-full right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 min-w-48 z-20 hidden;
+  }
+
+  .image-menu:hover .image-menu-dropdown {
+    @apply block;
+  }
+
+  /* Disc Detail Page Styles */
+  .disc-detail-header {
+    @apply mb-6 flex items-center gap-4;
+  }
+
+  .disc-detail-header h1 {
+    @apply text-2xl lg:text-3xl font-bold text-gray-900 m-0;
+  }
+
+  .disc-detail-content {
+    @apply grid grid-cols-1 lg:grid-cols-2 gap-8;
+  }
+
+  .disc-detail-images {
+    @apply grid grid-cols-1 sm:grid-cols-2 gap-4;
+  }
+
+  .disc-detail-image {
+    @apply w-full aspect-square object-cover rounded-lg border border-gray-200 shadow-sm;
+  }
+
+  .disc-detail-info {
+    @apply bg-white rounded-lg border border-gray-200 p-6 shadow-sm;
+  }
+
+  .disc-detail-info h3 {
+    @apply text-lg font-semibold text-gray-900 mb-4;
+  }
+
+  .detail-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 gap-4;
+  }
+
+  .detail-item {
+    @apply flex flex-col gap-1;
+  }
+
+  .detail-item.full-width {
+    @apply sm:col-span-2;
+  }
+
+  .detail-label {
+    @apply text-sm font-medium text-gray-600;
+  }
+
+  .detail-value {
+    @apply text-sm text-gray-900 break-words;
+  }
+
+  .error-message {
+    @apply text-center py-8;
+  }
+
+  .error-message p {
+    @apply text-red-600 mb-4;
   }
 
   .disc-type {
@@ -484,7 +577,7 @@
   }
 
   .disc-details {
-    @apply mb-6 space-y-4;
+    @apply mb-2 space-y-1;
   }
 
   .detail-row {
@@ -492,11 +585,11 @@
   }
 
   .detail-row .label {
-    @apply font-medium text-gray-600 text-sm;
+    @apply font-medium text-gray-600 text-xs;
   }
 
   .detail-row .value {
-    @apply text-gray-900 text-sm break-words;
+    @apply text-gray-900 text-xs break-words;
   }
 
   .disc-actions {

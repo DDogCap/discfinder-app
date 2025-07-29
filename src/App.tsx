@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { discService, imageService, Source, supabaseService, DiscCondition, DiscType } from './lib/supabase';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ImageUpload } from './components/ImageUpload';
-import { ReturnStatusManager } from './components/ReturnStatusManager';
+
 
 import { RakerDiverDashboard } from './components/RakerDiverDashboard';
 import { AdminBulkTurnins } from './components/AdminBulkTurnins';
@@ -15,23 +15,28 @@ import OptimizedImage from './components/OptimizedImage';
 import ImageModal from './components/ImageModal';
 
 
-type Page = 'home' | 'report-found' | 'login' | 'admin' | 'rakerdiver' | 'admin-bulk-turnins' | 'profile-import' | 'profile' | 'photo-migration';
+type Page = 'home' | 'report-found' | 'login' | 'admin' | 'rakerdiver' | 'admin-bulk-turnins' | 'profile-import' | 'profile' | 'photo-migration' | 'disc-detail';
 
 function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
+  const [selectedDiscId, setSelectedDiscId] = useState<string | null>(null);
   const { user, userRole, signOut, loading } = useAuth();
 
-  const handleNavigate = (page: string) => {
+  const handleNavigate = (page: string, discId?: string) => {
     setCurrentPage(page as Page);
+    if (discId) {
+      setSelectedDiscId(discId);
+    }
   };
 
   const renderPage = () => {
     switch (currentPage) {
       case 'home':
-        return <Home />;
+        return <Home onNavigate={handleNavigate} />;
       case 'report-found':
         return <ReportFound onNavigate={setCurrentPage} />;
-
+      case 'disc-detail':
+        return selectedDiscId ? <DiscDetail discId={selectedDiscId} onNavigate={handleNavigate} /> : <Home onNavigate={handleNavigate} />;
       case 'login':
         return <Login onNavigate={setCurrentPage} />;
       case 'admin':
@@ -47,7 +52,7 @@ function AppContent() {
       case 'profile':
         return user ? <ProfileManager userId={user.id} /> : <Login onNavigate={setCurrentPage} />;
       default:
-        return <Home />;
+        return <Home onNavigate={handleNavigate} />;
     }
   };
 
@@ -196,10 +201,179 @@ function AdminDashboard({ onNavigate }: PageProps) {
   );
 }
 
-function Home() {
+interface DiscDetailProps {
+  discId: string;
+  onNavigate: (page: string) => void;
+}
+
+function DiscDetail({ discId, onNavigate }: DiscDetailProps) {
+  const [disc, setDisc] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadDisc = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const result = await discService.getFoundDiscById(discId);
+        if (result.error) {
+          setError(typeof result.error === 'string' ? result.error : 'Failed to load disc');
+          setDisc(null);
+        } else {
+          setDisc(result.data);
+        }
+      } catch (error) {
+        console.error('Failed to load disc:', error);
+        setError('Failed to load disc details');
+        setDisc(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (discId) {
+      loadDisc();
+    }
+  }, [discId]);
+
+  if (isLoading) {
+    return (
+      <div className="main-container">
+        <div className="loading-message">Loading disc details...</div>
+      </div>
+    );
+  }
+
+  if (error || !disc) {
+    return (
+      <div className="main-container">
+        <div className="error-message">
+          <p>{error || 'Disc not found'}</p>
+          <button className="button secondary" onClick={() => onNavigate('home')}>
+            Back to Home
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="main-container">
+      <div className="disc-detail-header">
+        <button className="button secondary" onClick={() => onNavigate('home')}>
+          ← Back to Search
+        </button>
+        <h1>
+          {disc.rack_id && `#${disc.rack_id} `}
+          {disc.brand && disc.brand.toLowerCase() !== 'not specified' ? `${disc.brand} ` : ''}
+          {disc.mold || 'Unknown Mold'}
+        </h1>
+      </div>
+
+      <div className="disc-detail-content">
+        {/* Images */}
+        {disc.image_urls && disc.image_urls.length > 0 && (
+          <div className="disc-detail-images">
+            {disc.image_urls.map((url: string, index: number) => (
+              <img
+                key={index}
+                src={url}
+                alt={`${disc.brand} ${disc.mold || 'disc'} ${index + 1}`}
+                className="disc-detail-image"
+                loading="lazy"
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Disc Information */}
+        <div className="disc-detail-info">
+          <h3>Disc Information</h3>
+          <div className="detail-grid">
+            {disc.name_on_disc && (
+              <div className="detail-item">
+                <span className="detail-label">Name on disc:</span>
+                <span className="detail-value">{disc.name_on_disc}</span>
+              </div>
+            )}
+            {disc.phone_number && (
+              <div className="detail-item">
+                <span className="detail-label">Phone on disc:</span>
+                <span className="detail-value">{disc.phone_number}</span>
+              </div>
+            )}
+            {disc.color && (
+              <div className="detail-item">
+                <span className="detail-label">Color:</span>
+                <span className="detail-value">{disc.color}</span>
+              </div>
+            )}
+            {disc.weight && (
+              <div className="detail-item">
+                <span className="detail-label">Weight:</span>
+                <span className="detail-value">{disc.weight}g</span>
+              </div>
+            )}
+            {disc.condition && disc.condition.toLowerCase() !== 'unknown' && disc.condition.toLowerCase() !== 'not specified' && (
+              <div className="detail-item">
+                <span className="detail-label">Condition:</span>
+                <span className="detail-value">{disc.condition}</span>
+              </div>
+            )}
+            {disc.plastic_type && (
+              <div className="detail-item">
+                <span className="detail-label">Plastic:</span>
+                <span className="detail-value">{disc.plastic_type}</span>
+              </div>
+            )}
+            {disc.stamp_text && (
+              <div className="detail-item">
+                <span className="detail-label">Stamp:</span>
+                <span className="detail-value">{disc.stamp_text}</span>
+              </div>
+            )}
+            {disc.source_name && (
+              <div className="detail-item">
+                <span className="detail-label">Source:</span>
+                <span className="detail-value">{disc.source_name}</span>
+              </div>
+            )}
+            {disc.location_found && disc.location_found.toLowerCase() !== 'exact location unknown.' && disc.location_found.toLowerCase() !== 'unknown' && (
+              <div className="detail-item">
+                <span className="detail-label">Specific Location:</span>
+                <span className="detail-value">{disc.location_found}</span>
+              </div>
+            )}
+            <div className="detail-item">
+              <span className="detail-label">Found on:</span>
+              <span className="detail-value">{new Date(disc.found_date).toLocaleDateString()}</span>
+            </div>
+            {disc.description && (
+              <div className="detail-item full-width">
+                <span className="detail-label">Description:</span>
+                <span className="detail-value">{disc.description}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface HomeProps {
+  onNavigate: (page: string, discId?: string) => void;
+}
+
+function Home({ onNavigate }: HomeProps) {
   const { userRole } = useAuth();
   const [recentDiscs, setRecentDiscs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+
+  const handleNavigateToDetail = (discId: string) => {
+    onNavigate('disc-detail', discId);
+  };
 
   // Search functionality state
   const [searchQuery, setSearchQuery] = useState('');
@@ -266,36 +440,38 @@ function Home() {
     }
   }, [hasSearched]);
 
-  const handleReturnStatusUpdate = (discId: string, newStatus: string) => {
-    // Update both recent discs and search results
-    setRecentDiscs(prevDiscs =>
-      prevDiscs.map(disc =>
-        disc.id === discId
-          ? { ...disc, return_status: newStatus }
-          : disc
-      ).filter(disc => disc.return_status === 'Found') // Remove discs that are no longer 'Found'
-    );
+  const handleReturnStatusUpdate = async (discId: string, newStatus: string) => {
+    try {
+      // Update the database first
+      const { success, error } = await discService.updateReturnStatus(discId, newStatus as any);
 
-    setFoundDiscs(prevDiscs =>
-      prevDiscs.map(disc =>
-        disc.id === discId
-          ? { ...disc, return_status: newStatus, returned_at: new Date().toISOString() }
-          : disc
-      )
-    );
+      if (!success) {
+        console.error('Failed to update return status:', error);
+        return;
+      }
+
+      // Update both recent discs and search results
+      setRecentDiscs(prevDiscs =>
+        prevDiscs.map(disc =>
+          disc.id === discId
+            ? { ...disc, return_status: newStatus }
+            : disc
+        ).filter(disc => disc.return_status === 'Found') // Remove discs that are no longer 'Found'
+      );
+
+      setFoundDiscs(prevDiscs =>
+        prevDiscs.map(disc =>
+          disc.id === discId
+            ? { ...disc, return_status: newStatus, returned_at: new Date().toISOString() }
+            : disc
+        )
+      );
+    } catch (error) {
+      console.error('Error updating return status:', error);
+    }
   };
 
   // Image modal functions
-  const openImageModal = (imageUrl: string, alt: string, allImages: string[], index: number) => {
-    setImageModal({
-      isOpen: true,
-      imageUrl,
-      alt,
-      images: allImages,
-      currentIndex: index
-    });
-  };
-
   const closeImageModal = () => {
     setImageModal(prev => ({ ...prev, isOpen: false }));
   };
@@ -525,105 +701,58 @@ function Home() {
               {foundDiscs.map((disc) => (
                 <div key={disc.id} className="disc-card">
                   <div className="disc-header">
-                    <h4>
+                    <h4 onClick={() => handleNavigateToDetail(disc.id)}>
                       {disc.rack_id && `#${disc.rack_id} `}
                       {disc.brand && disc.brand.toLowerCase() !== 'not specified' ? `${disc.brand} ` : ''}
                       {disc.mold || 'Unknown Mold'}
                     </h4>
                   </div>
 
-                  {/* Return Status - only show for admin or if not 'Found' */}
-                  {(userRole === 'admin' || (disc.return_status && disc.return_status !== 'Found')) && (
-                    <ReturnStatusManager
-                      discId={disc.id}
-                      currentStatus={disc.return_status || 'Found'}
-                      onStatusUpdated={(newStatus) => handleReturnStatusUpdate(disc.id, newStatus)}
-                      disabled={userRole !== 'admin'}
-                    />
+                  {disc.name_on_disc && (
+                    <div className="disc-subheader">
+                      {disc.name_on_disc}
+                    </div>
                   )}
 
                   {disc.image_urls && disc.image_urls.length > 0 && (
-                    <div className="disc-images">
-                      {disc.image_urls.slice(0, 2).map((imageUrl: string, index: number) => (
-                        <OptimizedImage
-                          key={index}
-                          src={imageUrl}
-                          alt={`${disc.brand} ${disc.mold || 'disc'} ${index + 1}`}
-                          className="disc-image"
-                          thumbnail={true}
-                          onClick={() => openImageModal(
-                            imageUrl,
-                            `${disc.brand} ${disc.mold || 'disc'} ${index + 1}`,
-                            disc.image_urls,
-                            index
+                    <div className="disc-images" style={{ position: 'relative' }}>
+                      <OptimizedImage
+                        src={disc.image_urls[0]}
+                        alt={`${disc.brand} ${disc.mold || 'disc'}`}
+                        className="disc-image"
+                        thumbnail={true}
+                        onClick={() => handleNavigateToDetail(disc.id)}
+                      />
+                      {/* 3-dot menu for return to owner */}
+                      <div className="image-menu">
+                        <button className="image-menu-button">⋯</button>
+                        <div className="image-menu-dropdown">
+                          <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Returned to Owner')}>
+                            Return to Owner
+                          </div>
+                          {userRole === 'admin' && (
+                            <>
+                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Found')}>
+                                Mark as Found
+                              </div>
+                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Donated')}>
+                                Donated
+                              </div>
+                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Sold')}>
+                                Sold
+                              </div>
+                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'For Sale Used')}>
+                                For Sale Used
+                              </div>
+                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Trashed')}>
+                                Trashed
+                              </div>
+                            </>
                           )}
-                        />
-                      ))}
+                        </div>
+                      </div>
                     </div>
                   )}
-
-                  <div className="disc-details">
-                    {disc.color && (
-                      <div className="detail-row">
-                        <span className="label">Color:</span>
-                        <span className="value">{disc.color}</span>
-                      </div>
-                    )}
-
-                    {disc.weight && (
-                      <div className="detail-row">
-                        <span className="label">Weight:</span>
-                        <span className="value">{disc.weight}g</span>
-                      </div>
-                    )}
-
-                    {disc.condition && disc.condition.toLowerCase() !== 'unknown' && disc.condition.toLowerCase() !== 'not specified' && (
-                      <div className="detail-row">
-                        <span className="label">Condition:</span>
-                        <span className="value">{disc.condition}</span>
-                      </div>
-                    )}
-
-                    {disc.source_name && (
-                      <div className="detail-row">
-                        <span className="label">Source:</span>
-                        <span className="value">{disc.source_name}</span>
-                      </div>
-                    )}
-
-                    {disc.location_found && disc.location_found.toLowerCase() !== 'exact location unknown.' && disc.location_found.toLowerCase() !== 'unknown' && (
-                      <div className="detail-row">
-                        <span className="label">Specific Location:</span>
-                        <span className="value">{disc.location_found}</span>
-                      </div>
-                    )}
-
-                    <div className="detail-row">
-                      <span className="label">Found on:</span>
-                      <span className="value">{new Date(disc.found_date).toLocaleDateString()}</span>
-                    </div>
-
-                    {disc.phone_number && (
-                      <div className="detail-row">
-                        <span className="label">Phone on disc:</span>
-                        <span className="value">{disc.phone_number}</span>
-                      </div>
-                    )}
-
-                    {disc.name_on_disc && (
-                      <div className="detail-row">
-                        <span className="label">Name on disc:</span>
-                        <span className="value">{disc.name_on_disc}</span>
-                      </div>
-                    )}
-
-                    {disc.description && (
-                      <div className="detail-row">
-                        <span className="label">Description:</span>
-                        <span className="value">{disc.description}</span>
-                      </div>
-                    )}
-                  </div>
                 </div>
               ))}
             </div>
@@ -730,57 +859,57 @@ function Home() {
               {recentDiscs.map((disc) => (
                 <div key={disc.id} className="disc-card">
                   <div className="disc-header">
-                    <h4>
+                    <h4 onClick={() => handleNavigateToDetail(disc.id)}>
                       {disc.rack_id && `#${disc.rack_id} `}
                       {disc.brand && disc.brand.toLowerCase() !== 'not specified' ? `${disc.brand} ` : ''}
                       {disc.mold || 'Unknown Mold'}
                     </h4>
                   </div>
 
-                  {/* Return Status - only show for admin or if not 'Found' */}
-                  {(userRole === 'admin' || (disc.return_status && disc.return_status !== 'Found')) && (
-                    <ReturnStatusManager
-                      discId={disc.id}
-                      currentStatus={disc.return_status || 'Found'}
-                      onStatusUpdated={(newStatus) => handleReturnStatusUpdate(disc.id, newStatus)}
-                      disabled={userRole !== 'admin'}
-                    />
+                  {disc.name_on_disc && (
+                    <div className="disc-subheader">
+                      {disc.name_on_disc}
+                    </div>
                   )}
-
-                  {/* Disc Details */}
-                  <div className="disc-details">
-                    {disc.color && disc.color.toLowerCase() !== 'not specified' && (
-                      <p><strong>Color:</strong> {disc.color}</p>
-                    )}
-                    {disc.condition && disc.condition.toLowerCase() !== 'not specified' && (
-                      <p><strong>Condition:</strong> {disc.condition}</p>
-                    )}
-                    {disc.location_found && (
-                      <p><strong>Found at:</strong> {disc.location_found}</p>
-                    )}
-                    {disc.found_date && (
-                      <p><strong>Found:</strong> {new Date(disc.found_date).toLocaleDateString()}</p>
-                    )}
-                    {disc.source_name && (
-                      <p><strong>Source:</strong> {disc.source_name}</p>
-                    )}
-                  </div>
 
                   {/* Images */}
                   {disc.image_urls && disc.image_urls.length > 0 && (
-                    <div className="disc-images">
-                      {disc.image_urls.slice(0, 3).map((url: string, index: number) => (
-                        <img
-                          key={index}
-                          src={url}
-                          alt={`Disc ${index + 1}`}
-                          className="disc-image"
-                          loading="lazy"
-                        />
-                      ))}
-                      {disc.image_urls.length > 3 && (
-                        <div className="more-images">+{disc.image_urls.length - 3} more</div>
-                      )}
+                    <div className="disc-images" style={{ position: 'relative' }}>
+                      <img
+                        src={disc.image_urls[0]}
+                        alt={`${disc.brand} ${disc.mold || 'disc'}`}
+                        className="disc-image"
+                        loading="lazy"
+                        onClick={() => handleNavigateToDetail(disc.id)}
+                      />
+                      {/* 3-dot menu for return to owner */}
+                      <div className="image-menu">
+                        <button className="image-menu-button">⋯</button>
+                        <div className="image-menu-dropdown">
+                          <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Returned to Owner')}>
+                            Return to Owner
+                          </div>
+                          {userRole === 'admin' && (
+                            <>
+                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Found')}>
+                                Mark as Found
+                              </div>
+                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Donated')}>
+                                Donated
+                              </div>
+                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Sold')}>
+                                Sold
+                              </div>
+                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'For Sale Used')}>
+                                For Sale Used
+                              </div>
+                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Trashed')}>
+                                Trashed
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   )}
                 </div>

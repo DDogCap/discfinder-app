@@ -328,19 +328,23 @@
 
   /* Disc Card Styles */
   .disc-grid {
-    @apply grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3;
+    @apply grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6;
   }
 
   .disc-card {
-    @apply bg-white rounded-lg shadow-md border border-gray-200 p-6 hover:shadow-lg transition-shadow;
+    @apply bg-white rounded-lg shadow-md border border-gray-200 p-3 hover:shadow-lg transition-shadow;
   }
 
   .disc-header {
-    @apply mb-4;
+    @apply mb-2;
+  }
+
+  .disc-subheader {
+    @apply mb-3 text-sm text-gray-600 font-medium;
   }
 
   .disc-header h4 {
-    @apply text-lg font-semibold text-gray-900 mb-2;
+    @apply text-base font-semibold text-gray-900 mb-0 leading-tight;
   }
 
   .disc-meta {
@@ -356,11 +360,11 @@
   }
 
   .disc-images {
-    @apply grid grid-cols-2 gap-2 mt-4;
+    @apply grid grid-cols-1 gap-2 mt-2;
   }
 
   .disc-image {
-    @apply w-full h-32 object-cover rounded border;
+    @apply w-full aspect-square object-cover rounded border cursor-pointer;
   }
 
   /* Source Card Styles (similar to disc cards) */
