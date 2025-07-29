@@ -600,15 +600,8 @@ function Home({ onNavigate }: HomeProps) {
 
   return (
     <div>
+      {/* Search Bar */}
       <div className="hero">
-        <h1 className="text-4xl lg:text-6xl font-bold text-gray-900 mb-6">
-          Lost Your Disc?
-        </h1>
-        <p>
-          The DZDiscFinder helps disc golf players reunite with their lost discs, report found discs, or search for your lost discs in our database.
-        </p>
-
-        {/* Search Bar */}
         <div className="hero-search">
           <div className="search-input-container">
             <input
@@ -630,9 +623,7 @@ function Home({ onNavigate }: HomeProps) {
               </button>
             )}
           </div>
-          <p className="search-help-text">
-            Enter multiple search terms separated by spaces. Each term will be searched across all disc fields.
-          </p>
+
 
 
         </div>
@@ -708,11 +699,9 @@ function Home({ onNavigate }: HomeProps) {
                     </h4>
                   </div>
 
-                  {disc.name_on_disc && (
-                    <div className="disc-subheader">
-                      {disc.name_on_disc}
-                    </div>
-                  )}
+                  <div className="disc-subheader">
+                    {disc.name_on_disc || ''}
+                  </div>
 
                   {disc.image_urls && disc.image_urls.length > 0 && (
                     <div className="disc-images" style={{ position: 'relative' }}>
@@ -846,7 +835,6 @@ function Home({ onNavigate }: HomeProps) {
       ) : (
         /* Recent Found Discs Section */
         <div className="recent-discs-section">
-          <h2 className="text-2xl font-bold text-gray-900 mb-4">Recently Found Discs</h2>
 
           {isLoading ? (
             <div className="loading-message">Loading recent discs...</div>
@@ -864,11 +852,9 @@ function Home({ onNavigate }: HomeProps) {
                     </h4>
                   </div>
 
-                  {disc.name_on_disc && (
-                    <div className="disc-subheader">
-                      {disc.name_on_disc}
-                    </div>
-                  )}
+                  <div className="disc-subheader">
+                    {disc.name_on_disc || ''}
+                  </div>
 
                   {/* Images */}
                   {disc.image_urls && disc.image_urls.length > 0 && (
