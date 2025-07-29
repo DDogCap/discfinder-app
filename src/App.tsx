@@ -723,34 +723,32 @@ function Home({ onNavigate }: HomeProps) {
                         thumbnail={true}
                         onClick={() => handleNavigateToDetail(disc.id)}
                       />
-                      {/* 3-dot menu for return to owner */}
-                      <div className="image-menu">
-                        <button className="image-menu-button">⋯</button>
-                        <div className="image-menu-dropdown">
-                          <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Returned to Owner')}>
-                            Return to Owner
+                      {/* 3-dot menu for return status - admin only */}
+                      {userRole === 'admin' && (
+                        <div className="image-menu">
+                          <button className="image-menu-button">⋯</button>
+                          <div className="image-menu-dropdown">
+                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Returned to Owner')}>
+                              Return to Owner
+                            </div>
+                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Found')}>
+                              Mark as Found
+                            </div>
+                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Donated')}>
+                              Donated
+                            </div>
+                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Sold')}>
+                              Sold
+                            </div>
+                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'For Sale Used')}>
+                              For Sale Used
+                            </div>
+                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Trashed')}>
+                              Trashed
+                            </div>
                           </div>
-                          {userRole === 'admin' && (
-                            <>
-                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Found')}>
-                                Mark as Found
-                              </div>
-                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Donated')}>
-                                Donated
-                              </div>
-                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Sold')}>
-                                Sold
-                              </div>
-                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'For Sale Used')}>
-                                For Sale Used
-                              </div>
-                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Trashed')}>
-                                Trashed
-                              </div>
-                            </>
-                          )}
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -882,34 +880,32 @@ function Home({ onNavigate }: HomeProps) {
                         loading="lazy"
                         onClick={() => handleNavigateToDetail(disc.id)}
                       />
-                      {/* 3-dot menu for return to owner */}
-                      <div className="image-menu">
-                        <button className="image-menu-button">⋯</button>
-                        <div className="image-menu-dropdown">
-                          <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Returned to Owner')}>
-                            Return to Owner
+                      {/* 3-dot menu for return status - admin only */}
+                      {userRole === 'admin' && (
+                        <div className="image-menu">
+                          <button className="image-menu-button">⋯</button>
+                          <div className="image-menu-dropdown">
+                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Returned to Owner')}>
+                              Return to Owner
+                            </div>
+                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Found')}>
+                              Mark as Found
+                            </div>
+                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Donated')}>
+                              Donated
+                            </div>
+                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Sold')}>
+                              Sold
+                            </div>
+                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'For Sale Used')}>
+                              For Sale Used
+                            </div>
+                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Trashed')}>
+                              Trashed
+                            </div>
                           </div>
-                          {userRole === 'admin' && (
-                            <>
-                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Found')}>
-                                Mark as Found
-                              </div>
-                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Donated')}>
-                                Donated
-                              </div>
-                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Sold')}>
-                                Sold
-                              </div>
-                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'For Sale Used')}>
-                                For Sale Used
-                              </div>
-                              <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Trashed')}>
-                                Trashed
-                              </div>
-                            </>
-                          )}
                         </div>
-                      </div>
+                      )}
                     </div>
                   )}
                 </div>
