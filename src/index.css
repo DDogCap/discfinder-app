@@ -460,7 +460,7 @@
   }
 
   .disc-subheader {
-    @apply mb-2 text-sm text-gray-600 font-medium;
+    @apply mb-2 text-sm text-gray-600 font-medium min-h-[1.25rem];
   }
 
   .disc-meta {
