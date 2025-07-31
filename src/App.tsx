@@ -820,7 +820,7 @@ function Home({ onNavigate }: HomeProps) {
               type="text"
               value={searchQuery}
               onChange={handleSearchInputChange}
-              placeholder="Search by brand, mold, color, rack ID, location, or any other details (e.g., 'Innova Blue Trespass', 'Hole 7', '417')"
+              placeholder="Search by brand, mold, color, rack ID, location, or any other details (e.g., 'Innova Blue Trespass', 'Hole 7', '417', '#417')"
               className="hero-search-input"
               autoFocus
             />

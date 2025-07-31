@@ -761,7 +761,9 @@ export const discService = {
   async searchFoundDiscsSingleTermPage(term: string, limit: number, offset: number, sortBy: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc' = 'newest', minRackId?: number, maxRackId?: number) {
     try {
       const lowerTerm = term.toLowerCase();
-      const rackIdNum = parseInt(term);
+      // Handle rack ID searches - strip # prefix if present
+      const cleanTerm = term.startsWith('#') ? term.substring(1) : term;
+      const rackIdNum = parseInt(cleanTerm);
       const isNumericSearch = !isNaN(rackIdNum);
 
       // If it's a numeric search (likely rack_id), try direct rack_id query first
@@ -862,7 +864,9 @@ export const discService = {
   async searchFoundDiscsSingleTermChunked(term: string) {
     try {
       const lowerTerm = term.toLowerCase();
-      const rackIdNum = parseInt(term);
+      // Handle rack ID searches - strip # prefix if present
+      const cleanTerm = term.startsWith('#') ? term.substring(1) : term;
+      const rackIdNum = parseInt(cleanTerm);
       const isNumericSearch = !isNaN(rackIdNum);
 
       console.log(`Searching for single term "${term}" using chunked approach...`);
@@ -995,7 +999,9 @@ export const discService = {
             field && field.toLowerCase().includes(lowerTerm)
           );
 
-          const rackIdNum = parseInt(term);
+          // Handle rack ID searches - strip # prefix if present
+          const cleanTerm = term.startsWith('#') ? term.substring(1) : term;
+          const rackIdNum = parseInt(cleanTerm);
           const matchesRackId = !isNaN(rackIdNum) && disc.rack_id === rackIdNum;
 
           return matchesText || matchesRackId;
@@ -1067,7 +1073,9 @@ export const discService = {
             field && field.toLowerCase().includes(lowerTerm)
           );
 
-          const rackIdNum = parseInt(term);
+          // Handle rack ID searches - strip # prefix if present
+          const cleanTerm = term.startsWith('#') ? term.substring(1) : term;
+          const rackIdNum = parseInt(cleanTerm);
           const matchesRackId = !isNaN(rackIdNum) && disc.rack_id === rackIdNum;
 
           return matchesText || matchesRackId;
