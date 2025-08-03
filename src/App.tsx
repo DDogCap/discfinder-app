@@ -690,11 +690,16 @@ function Home({ onNavigate }: HomeProps) {
         const rackIdText = disc?.rack_id ? `#${disc.rack_id} ` : '';
         setReturnSuccessMessage(`${rackIdText}Returned!`);
 
-        // Navigate back to home after showing the message briefly
+        // Clear search to show all non-returned discs
+        setSearchQuery('');
+        setFoundDiscs([]);
+        setHasSearched(false);
+        setCurrentPage(1);
+
+        // Clear the success message after showing it briefly
         setTimeout(() => {
           setReturnSuccessMessage('');
-          onNavigate('home');
-        }, 2000);
+        }, 3000);
       }
     } catch (error) {
       console.error('Error updating return status:', error);
@@ -830,9 +835,9 @@ function Home({ onNavigate }: HomeProps) {
 
   return (
     <div>
-      {/* Return Success Message */}
+      {/* Return Success Toast */}
       {returnSuccessMessage && (
-        <div className="status-message success" style={{ margin: '20px', textAlign: 'center' }}>
+        <div className="return-success-toast">
           {returnSuccessMessage}
         </div>
       )}
