@@ -617,6 +617,9 @@ function Home({ onNavigate }: HomeProps) {
     currentIndex: 0
   });
 
+  // Success message state for return confirmations
+  const [returnSuccessMessage, setReturnSuccessMessage] = useState('');
+
   // Debounce timer ref
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -654,6 +657,9 @@ function Home({ onNavigate }: HomeProps) {
 
   const handleReturnStatusUpdate = async (discId: string, newStatus: string) => {
     try {
+      // Find the disc to get its rack_id for the confirmation message
+      const disc = [...recentDiscs, ...foundDiscs].find(d => d.id === discId);
+
       // Update the database first
       const { success, error } = await discService.updateReturnStatus(discId, newStatus as any);
 
@@ -678,6 +684,18 @@ function Home({ onNavigate }: HomeProps) {
             : disc
         )
       );
+
+      // Show confirmation message for "Returned to Owner" status
+      if (newStatus === 'Returned to Owner') {
+        const rackIdText = disc?.rack_id ? `#${disc.rack_id} ` : '';
+        setReturnSuccessMessage(`${rackIdText}Returned!`);
+
+        // Navigate back to home after showing the message briefly
+        setTimeout(() => {
+          setReturnSuccessMessage('');
+          onNavigate('home');
+        }, 2000);
+      }
     } catch (error) {
       console.error('Error updating return status:', error);
     }
@@ -812,6 +830,13 @@ function Home({ onNavigate }: HomeProps) {
 
   return (
     <div>
+      {/* Return Success Message */}
+      {returnSuccessMessage && (
+        <div className="status-message success" style={{ margin: '20px', textAlign: 'center' }}>
+          {returnSuccessMessage}
+        </div>
+      )}
+
       {/* Search Bar */}
       <div className="hero">
         <div className="hero-search">
