@@ -695,6 +695,34 @@ function Home({ onNavigate }: HomeProps) {
         setFoundDiscs([]);
         setHasSearched(false);
         setCurrentPage(1);
+        setIsSearching(false);
+        setTotalCount(0);
+
+        // Force reload of recent discs to show updated list after a brief delay
+        // to ensure state updates are processed
+        setTimeout(async () => {
+          setIsLoading(true);
+          try {
+            const result = await discService.getFoundDiscs({
+              limit: 24,
+              offset: 0,
+              fetchAll: false,
+              sortBy: 'newest'
+            });
+
+            if (result.error) {
+              console.error('Error loading recent discs:', result.error);
+              setRecentDiscs([]);
+            } else {
+              setRecentDiscs(result.data || []);
+            }
+          } catch (error) {
+            console.error('Failed to load recent discs:', error);
+            setRecentDiscs([]);
+          } finally {
+            setIsLoading(false);
+          }
+        }, 100);
 
         // Clear the success message after showing it briefly
         setTimeout(() => {
