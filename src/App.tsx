@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { discService, imageService, Source, supabaseService, DiscCondition, DiscType, supabase } from './lib/supabase';
+import { discService, imageService, Source, supabaseService, DiscCondition, DiscType, supabase, Profile } from './lib/supabase';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ImageUpload } from './components/ImageUpload';
 
@@ -345,9 +345,114 @@ function FAQManager({ onClose }: { onClose: () => void }) {
 }
 
 function AdminDashboard({ onNavigate }: PageProps) {
-  const { userRole } = useAuth();
+  const { userRole, user } = useAuth();
   const [showSourceManager, setShowSourceManager] = useState(false);
   const [showFAQManager, setShowFAQManager] = useState(false);
+
+  // Admin management state
+  const [admins, setAdmins] = useState<Profile[]>([]);
+  const [isLoadingAdmins, setIsLoadingAdmins] = useState(false);
+  const [newAdminEmail, setNewAdminEmail] = useState('');
+  const [newAdminName, setNewAdminName] = useState('');
+  const [adminActionMessage, setAdminActionMessage] = useState('');
+
+
+  // Load current admins (visible to all admins)
+  useEffect(() => {
+    const fetchAdmins = async () => {
+      try {
+        setIsLoadingAdmins(true);
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('role', 'admin')
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+        setAdmins((data as Profile[]) || []);
+      } catch (err) {
+        console.error('Error loading admins:', err);
+      } finally {
+        setIsLoadingAdmins(false);
+      }
+    };
+
+    fetchAdmins();
+  }, []);
+
+  // Super user email who can add/demote admins
+  const superUserEmail = 'galen.adams@dropzonepaintball.com';
+
+  const isSuperUser = !!user && user.email === superUserEmail;
+
+  const addNewAdmin = async () => {
+    try {
+      setAdminActionMessage('');
+      if (!newAdminEmail) {
+        setAdminActionMessage('Please enter an email address.');
+        return;
+      }
+      // Use import_legacy_profile to create a staging/admin profile if not exists
+      const { data, error } = await supabase.rpc('import_legacy_profile', {
+        // The function returns a staging id; we don't need it here
+
+        p_email: newAdminEmail.trim(),
+        p_full_name: newAdminName.trim(),
+        p_role: 'admin'
+      });
+      if (error) throw error;
+      setAdminActionMessage('Admin profile prepared. Ask the user to sign up with that email to activate.');
+      setNewAdminEmail('');
+      setNewAdminName('');
+      // Refresh list
+      const { data: adminsData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'admin')
+        .order('created_at', { ascending: false });
+      setAdmins((adminsData as Profile[]) || []);
+    } catch (err: any) {
+      console.error('Error adding admin:', err);
+      setAdminActionMessage(err?.message || 'Failed to add admin');
+    }
+  };
+
+  const demoteAdmin = async (email: string) => {
+    try {
+      setAdminActionMessage('');
+      if (!isSuperUser) {
+        setAdminActionMessage('Only the super user can change admin roles.');
+        return;
+      }
+
+      // Prefer secure RPC to change role (requires DB function from SUPER_ADMIN_ROLE_FUNCTIONS.sql)
+      const { error: rpcError } = await supabase.rpc('super_update_user_role', {
+        p_email: email,
+        p_new_role: 'user'
+      } as any);
+
+      if (rpcError) {
+        // Fallback (may fail due to RLS)
+        const { error } = await supabase
+          .from('profiles')
+          .update({ role: 'user', updated_at: new Date().toISOString() })
+          .eq('email', email);
+        if (error) throw error;
+      }
+
+      setAdminActionMessage(`Demoted ${email} to user`);
+      // Refresh list
+      const { data: adminsData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('role', 'admin')
+        .order('created_at', { ascending: false });
+      setAdmins((adminsData as Profile[]) || []);
+    } catch (err: any) {
+      console.error('Error demoting admin:', err);
+      setAdminActionMessage(err?.message || 'Failed to update role');
+    }
+  };
 
   // Redirect if not admin
   if (userRole !== 'admin') {
@@ -381,6 +486,78 @@ function AdminDashboard({ onNavigate }: PageProps) {
           onClick={() => onNavigate('admin-bulk-turnins')}
         >
           Manage Bulk Turn-Ins
+
+      {/* Admin Management */}
+      <div className="dashboard-section">
+        <h2>Admin Management</h2>
+        {adminActionMessage && (
+          <div className={`status-message ${adminActionMessage.toLowerCase().includes('fail') || adminActionMessage.toLowerCase().includes('error') ? 'error' : 'success'}`}>
+            {adminActionMessage}
+          </div>
+        )}
+
+        {/* Admins List - visible to all admins */}
+        <div className="admin-list">
+          <h3>Current Admins</h3>
+          {isLoadingAdmins ? (
+            <p>Loading admins...</p>
+          ) : admins.length === 0 ? (
+            <p>No admins found.</p>
+          ) : (
+            <ul>
+              {admins.map((a) => (
+                <li key={a.id} className="flex items-center justify-between py-2 border-b border-gray-200">
+                  <div>
+                    <div className="font-medium">{a.full_name || 'No Name'}</div>
+                    <div className="text-sm text-gray-600">{a.email}</div>
+                  </div>
+                  {/* Demote button - only for super user and not for super user account */}
+                  {isSuperUser && a.email !== 'galen.adams@dropzonepaintball.com' && (
+                    <button
+                      className="button secondary"
+                      onClick={() => demoteAdmin(a.email)}
+                      title="Demote to user"
+                    >
+                      Demote to User
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Add New Admin - visible only to super user */}
+        {isSuperUser && (
+          <div className="add-admin mt-6 p-4 bg-gray-50 rounded-md border border-gray-200">
+            <h3>Add New Admin</h3>
+            <p className="text-sm text-gray-600">Create an admin profile by email and name. The user should then sign up with that email.</p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+              <input
+                type="email"
+                placeholder="Admin Email"
+                value={newAdminEmail}
+                onChange={(e) => setNewAdminEmail(e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-2"
+              />
+              <input
+                type="text"
+                placeholder="Full Name (optional)"
+                value={newAdminName}
+                onChange={(e) => setNewAdminName(e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-2"
+              />
+              <button
+                className="button primary"
+                onClick={addNewAdmin}
+              >
+                Add Admin
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
         </button>
         <button
           className="hero-button secondary"
