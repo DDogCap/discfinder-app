@@ -384,7 +384,8 @@ function AdminDashboard({ onNavigate }: PageProps) {
         const { data, error } = await supabase
           .from('imported_profiles')
           .select('*')
-          .eq('needs_signup', true);
+          .eq('needs_signup', true)
+          .eq('role', 'admin');
         if (error) throw error;
         setPendingAdmins(data || []);
       } catch (err) {
@@ -445,7 +446,8 @@ function AdminDashboard({ onNavigate }: PageProps) {
       const { data: pendingData } = await supabase
         .from('imported_profiles')
         .select('*')
-        .eq('needs_signup', true);
+        .eq('needs_signup', true)
+        .eq('role', 'admin');
       setPendingAdmins(pendingData || []);
     } catch (err: any) {
       console.error('Error adding admin:', err);
