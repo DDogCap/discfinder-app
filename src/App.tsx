@@ -351,7 +351,9 @@ function AdminDashboard({ onNavigate }: PageProps) {
 
   // Admin management state
   const [admins, setAdmins] = useState<Profile[]>([]);
+  const [pendingAdmins, setPendingAdmins] = useState<any[]>([]);
   const [isLoadingAdmins, setIsLoadingAdmins] = useState(false);
+  const [isLoadingPending, setIsLoadingPending] = useState(false);
   const [newAdminEmail, setNewAdminEmail] = useState('');
   const [newAdminName, setNewAdminName] = useState('');
   const [adminActionMessage, setAdminActionMessage] = useState('');
@@ -376,6 +378,23 @@ function AdminDashboard({ onNavigate }: PageProps) {
         setIsLoadingAdmins(false);
       }
     };
+    const fetchPending = async () => {
+      try {
+        setIsLoadingPending(true);
+        const { data, error } = await supabase
+          .from('imported_profiles')
+          .select('*')
+          .eq('needs_signup', true);
+        if (error) throw error;
+        setPendingAdmins(data || []);
+      } catch (err) {
+        console.error('Error loading pending admins:', err);
+      } finally {
+        setIsLoadingPending(false);
+      }
+    };
+
+    fetchPending();
 
     fetchAdmins();
   }, []);
@@ -392,25 +411,42 @@ function AdminDashboard({ onNavigate }: PageProps) {
         setAdminActionMessage('Please enter an email address.');
         return;
       }
-      // Use import_legacy_profile to create a staging/admin profile if not exists
-      const { data, error } = await supabase.rpc('import_legacy_profile', {
-        // The function returns a staging id; we don't need it here
 
+      // Try to add/upgrade immediately via RPC if user exists; otherwise create pending
+      const { error: rpcError } = await supabase.rpc('admin_add_admin_user', {
         p_email: newAdminEmail.trim(),
-        p_full_name: newAdminName.trim(),
-        p_role: 'admin'
-      });
-      if (error) throw error;
-      setAdminActionMessage('Admin profile prepared. Ask the user to sign up with that email to activate.');
+        p_full_name: newAdminName.trim()
+      } as any);
+
+      if (rpcError) {
+        // Fallback to creating a pending imported profile
+        const { error: importError } = await supabase.rpc('import_legacy_profile', {
+          p_email: newAdminEmail.trim(),
+          p_full_name: newAdminName.trim(),
+          p_role: 'admin'
+        });
+        if (importError) throw importError;
+        setAdminActionMessage('Pending admin created. They will appear in Profiles after signup.');
+      } else {
+        setAdminActionMessage('Admin added or upgraded successfully.');
+      }
+
       setNewAdminEmail('');
       setNewAdminName('');
-      // Refresh list
+
+      // Refresh lists
       const { data: adminsData } = await supabase
         .from('profiles')
         .select('*')
         .eq('role', 'admin')
         .order('created_at', { ascending: false });
       setAdmins((adminsData as Profile[]) || []);
+
+      const { data: pendingData } = await supabase
+        .from('imported_profiles')
+        .select('*')
+        .eq('needs_signup', true);
+      setPendingAdmins(pendingData || []);
     } catch (err: any) {
       console.error('Error adding admin:', err);
       setAdminActionMessage(err?.message || 'Failed to add admin');
@@ -486,9 +522,43 @@ function AdminDashboard({ onNavigate }: PageProps) {
           onClick={() => onNavigate('admin-bulk-turnins')}
         >
           Manage Bulk Turn-Ins
+        </button>
+        <button
+          className="hero-button secondary"
+          onClick={() => setShowSourceManager(true)}
+        >
+          Manage Sources
+        </button>
+        <button
+          className="hero-button secondary"
+          onClick={() => setShowFAQManager(true)}
+        >
+          Manage FAQs
+        </button>
+      </div>
 
       {/* Admin Management */}
       <div className="dashboard-section">
+
+        {/* Pending Admins */}
+        <div className="admin-list mt-8">
+          <h3>Pending Admins (need to sign up)</h3>
+          {isLoadingPending ? (
+            <p>Loading pending admins...</p>
+          ) : pendingAdmins.length === 0 ? (
+            <p>No pending admins.</p>
+          ) : (
+            <ul>
+              {pendingAdmins.map((p) => (
+                <li key={p.id} className="py-2 border-b border-gray-200">
+                  <div className="font-medium">{p.full_name || 'No Name'}</div>
+                  <div className="text-sm text-gray-600">{p.email}</div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
         <h2>Admin Management</h2>
         {adminActionMessage && (
           <div className={`status-message ${adminActionMessage.toLowerCase().includes('fail') || adminActionMessage.toLowerCase().includes('error') ? 'error' : 'success'}`}>
@@ -557,25 +627,6 @@ function AdminDashboard({ onNavigate }: PageProps) {
           </div>
         )}
       </div>
-
-        </button>
-        <button
-          className="hero-button secondary"
-          onClick={() => setShowSourceManager(true)}
-        >
-          Manage Sources
-        </button>
-        <button
-          className="hero-button secondary"
-          onClick={() => setShowFAQManager(true)}
-        >
-          Manage FAQs
-        </button>
-      </div>
-
-
-
-
 
       {/* Source Manager Modal */}
       {showSourceManager && (
