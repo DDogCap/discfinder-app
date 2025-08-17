@@ -37,6 +37,24 @@ function FAQ() {
     loadFAQs();
   }, []);
 
+  // Convert certain phrases/URLs in FAQ answers to clickable links
+  const formatAnswer = (answer: string) => {
+    if (!answer) return { __html: '' };
+
+    let html = answer;
+
+    // Make the specific store phrase a link to DZ Discs Lawrence, KS store page
+    const storePhrase = /retail store in Lawrence, KS/i;
+    const storeUrl = 'https://www.dzdiscs.com/pages/disc-golf-store-in-lawrence-ks';
+    html = html.replace(storePhrase, `<a href="${storeUrl}" target="_blank" rel="noopener noreferrer">$&</a>`);
+
+    // Auto-link any raw URLs in the text
+    const urlRegex = /(https?:\/\/[^\s)]+)(?![^<]*>|[^<>]*<\/(?:a|script|style)>)/g;
+    html = html.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer">$1</a>');
+
+    return { __html: html };
+  };
+
   return (
     <div className="main-container">
       <div className="max-w-4xl mx-auto">
@@ -51,7 +69,10 @@ function FAQ() {
             {faqs.map((faq) => (
               <div key={faq.id} className="faq-item bg-white rounded-lg shadow-md p-6">
                 <h3 className="text-lg font-semibold text-gray-900 mb-3">{faq.question}</h3>
-                <div className="text-gray-700 whitespace-pre-wrap">{faq.answer}</div>
+                <div
+                  className="text-gray-700 whitespace-pre-wrap"
+                  dangerouslySetInnerHTML={formatAnswer(faq.answer)}
+                />
               </div>
             ))}
           </div>
