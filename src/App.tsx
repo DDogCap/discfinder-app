@@ -674,6 +674,32 @@ function DiscDetail({ discId, onNavigate }: DiscDetailProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const { userRole } = useAuth();
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  const handleMarkReturned = async () => {
+    try {
+      setIsUpdating(true);
+      setStatusMessage(null);
+      const { success, error } = await discService.updateReturnStatus(
+        discId,
+        'Returned to Owner' as any
+      );
+      if (!success) {
+        console.error('Failed to update return status:', error);
+        setStatusMessage('Failed to mark as returned');
+        return;
+      }
+      setDisc((prev: any) => (prev ? { ...prev, return_status: 'Returned to Owner', returned_at: new Date().toISOString() } : prev));
+      setStatusMessage('Marked as returned to owner');
+    } catch (e) {
+      console.error(e);
+      setStatusMessage('Failed to mark as returned');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
   useEffect(() => {
     const loadDisc = async () => {
       setIsLoading(true);
@@ -723,16 +749,37 @@ function DiscDetail({ discId, onNavigate }: DiscDetailProps) {
 
   return (
     <div className="main-container">
-      <div className="disc-detail-header">
-        <button className="button secondary" onClick={() => onNavigate('home')}>
-          ← Back to Search
-        </button>
-        <h1>
-          {disc.rack_id && `#${disc.rack_id} `}
-          {disc.brand && disc.brand.toLowerCase() !== 'not specified' ? `${disc.brand} ` : ''}
-          {disc.mold || 'Unknown Mold'}
-        </h1>
+      <div className="disc-detail-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div className="disc-detail-header-left" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          <button className="button secondary" onClick={() => onNavigate('home')}>
+            ← Back to Search
+          </button>
+          <h1 style={{ margin: 0 }}>
+            {disc.rack_id && `#${disc.rack_id} `}
+            {disc.brand && disc.brand.toLowerCase() !== 'not specified' ? `${disc.brand} ` : ''}
+            {disc.mold || 'Unknown Mold'}
+          </h1>
+        </div>
+        {userRole === 'admin' && (
+          <div className="disc-detail-admin-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            {disc.return_status && (
+              <span className="status-badge" style={{ padding: '0.25rem 0.5rem', borderRadius: '9999px', background: '#eef2ff', color: '#3730a3', fontSize: '0.75rem', fontWeight: 600 }}>
+                {disc.return_status}
+              </span>
+            )}
+            {disc.return_status !== 'Returned to Owner' && (
+              <button className="button primary" onClick={handleMarkReturned} disabled={isUpdating}>
+                {isUpdating ? 'Updating…' : 'Return to Owner'}
+              </button>
+            )}
+          </div>
+        )}
       </div>
+      {statusMessage && (
+        <div className="return-success-toast" style={{ marginTop: '0.5rem' }}>
+          {statusMessage}
+        </div>
+      )}
 
       <div className="disc-detail-content">
         {/* Images */}
