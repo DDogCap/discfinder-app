@@ -360,6 +360,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       console.log('Supabase not configured, running in demo mode');
+    } finally {
+      // Clear any persisted role and force a full reload so UI reflects guest permissions immediately
+      try {
+        localStorage.removeItem('discfinder_user_role');
+      } catch (e) {
+        // ignore storage errors
+      }
+      if (typeof window !== 'undefined' && window.location) {
+        // Small delay to allow a toast to render before reload
+        setTimeout(() => window.location.reload(), 600);
+      }
     }
   };
 

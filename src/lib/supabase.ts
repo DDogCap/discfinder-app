@@ -77,6 +77,8 @@ export interface FoundDisc {
   stamp_text?: string
   phone_number?: string
   name_on_disc?: string
+  owner_email?: string
+  owner_pdga_number?: number | string
   location_found: string
   location_coordinates?: { x: number; y: number }
   source_id?: string
@@ -766,6 +768,9 @@ export const discService = {
       const rackIdNum = parseInt(cleanTerm);
       const isNumericSearch = !isNaN(rackIdNum);
 
+      // Capture rack_id results to optionally merge with other matches
+      let rackIdResults: FoundDisc[] | null | undefined = undefined;
+
       // If it's a numeric search (likely rack_id), try direct rack_id query first
       if (isNumericSearch) {
         console.log(`Searching for rack_id: ${rackIdNum}`);
@@ -793,14 +798,7 @@ export const discService = {
           console.error('Rack ID search error:', rackIdError);
         } else if (rackIdResults && rackIdResults.length > 0) {
           console.log(`Found ${rackIdResults.length} discs with rack_id ${rackIdNum}`);
-          // For exact rack_id matches, return immediately
-          return {
-            data: rackIdResults,
-            error: null,
-            count: rackIdResults.length,
-            hasMore: false,
-            nextOffset: 0
-          };
+          // Do not return early; we'll merge with phone/email/name matches below
         }
       }
 
@@ -833,6 +831,87 @@ export const discService = {
         }
       }
 
+      // Try a server-side multi-field search (public view first)
+      try {
+        const likeTerm = `%${term}%`;
+        // Public view OR search across common text fields including owner-related fields
+        let { data: orData, error: orError } = await supabase
+          .from('public_found_discs')
+          .select('*')
+          .or(
+            [
+              `brand.ilike.${likeTerm}`,
+              `mold.ilike.${likeTerm}`,
+              `color.ilike.${likeTerm}`,
+              `location_found.ilike.${likeTerm}`,
+              `description.ilike.${likeTerm}`,
+              `stamp_text.ilike.${likeTerm}`,
+              `phone_number.ilike.${likeTerm}`,
+              `name_on_disc.ilike.${likeTerm}`,
+              `plastic_type.ilike.${likeTerm}`,
+              `disc_type.ilike.${likeTerm}`,
+              `owner_email.ilike.${likeTerm}`
+            ].join(',')
+          )
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1);
+
+        // If public view OR search fails, try main table with status filter
+        if (orError) {
+          let mainQuery = supabase
+            .from('found_discs')
+            .select('*')
+            .eq('status', 'active')
+            .order('created_at', { ascending: false })
+            .range(offset, offset + limit - 1);
+
+          // Apply OR across text fields on main table
+          mainQuery = mainQuery.or(
+            [
+              `brand.ilike.${likeTerm}`,
+              `mold.ilike.${likeTerm}`,
+              `color.ilike.${likeTerm}`,
+              `location_found.ilike.${likeTerm}`,
+              `description.ilike.${likeTerm}`,
+              `stamp_text.ilike.${likeTerm}`,
+              `phone_number.ilike.${likeTerm}`,
+              `name_on_disc.ilike.${likeTerm}`,
+              `plastic_type.ilike.${likeTerm}`,
+              `disc_type.ilike.${likeTerm}`,
+              `owner_email.ilike.${likeTerm}`
+            ].join(',')
+          );
+
+          const res = await mainQuery;
+          orData = res.data as any[] | null;
+          orError = res.error;
+        }
+
+        if (!orError && orData) {
+          // Merge rack_id results (if any) with OR results (phone/email/etc.) and de-duplicate
+          const seen = new Set<string>();
+          const combined = [
+            ...(Array.isArray(rackIdResults) ? rackIdResults : []),
+            ...orData
+          ].filter(d => (seen.has(d.id) ? false : (seen.add(d.id), true)));
+
+          // Sort and paginate combined results
+          let sorted = this.sortFoundDiscs(combined as any, sortBy);
+          const paged = sorted.slice(offset, offset + limit);
+
+          return {
+            data: paged,
+            error: null,
+            count: combined.length,
+            hasMore: offset + limit < combined.length,
+            nextOffset: offset + limit
+          };
+        }
+      } catch (e) {
+        // Non-fatal; fall through to full search
+        console.warn('OR search failed, falling back to full search');
+      }
+
       // If no exact rack_id match or it's a text search, fall back to full search
       console.log(`Performing full search for term: "${term}"`);
 
@@ -848,7 +927,7 @@ export const discService = {
       }
 
       // Filter discs that match the search term
-      const filteredDiscs = allDiscs.filter(disc => {
+      let filteredDiscs = allDiscs.filter(disc => {
         const textFields = [
           disc.brand,
           disc.mold,
@@ -858,6 +937,8 @@ export const discService = {
           disc.stamp_text,
           disc.phone_number,
           disc.name_on_disc,
+          disc.owner_email,
+          disc.owner_pdga_number ? String(disc.owner_pdga_number) : undefined,
           disc.plastic_type,
           disc.disc_type
         ];
@@ -870,6 +951,15 @@ export const discService = {
 
         return matchesText || matchesRackId;
       });
+
+      // If we have specific rack_id results, ensure they are present (merge/dedupe)
+      if (Array.isArray(rackIdResults) && rackIdResults.length > 0) {
+        const byId = new Map(filteredDiscs.map(d => [d.id, d]));
+        for (const d of rackIdResults) {
+          byId.set(d.id, d);
+        }
+        filteredDiscs = Array.from(byId.values());
+      }
 
       console.log(`Full search found ${filteredDiscs.length} matching discs`);
 
@@ -900,6 +990,9 @@ export const discService = {
 
       console.log(`Searching for single term "${term}" using chunked approach...`);
 
+      // Capture rack_id results to optionally merge with other matches
+      let rackIdResults: FoundDisc[] | null | undefined = undefined;
+
       // If it's a numeric search (likely rack_id), try direct rack_id query first
       if (isNumericSearch) {
         console.log(`Trying direct rack_id search for: ${rackIdNum}`);
@@ -927,14 +1020,7 @@ export const discService = {
           console.error('Rack ID search error:', rackIdError);
         } else if (rackIdResults && rackIdResults.length > 0) {
           console.log(`Found ${rackIdResults.length} discs with rack_id ${rackIdNum}`);
-          // For exact rack_id matches, return immediately
-          return {
-            data: rackIdResults,
-            error: null,
-            count: rackIdResults.length,
-            hasMore: false,
-            nextOffset: 0
-          };
+          // Do not return early; continue to include phone/email/name matches
         }
       }
 
@@ -982,7 +1068,7 @@ export const discService = {
       }
 
       // Filter discs that match the search term
-      const filteredDiscs = allDiscs.filter(disc => {
+      let filteredDiscs = allDiscs.filter(disc => {
         const textFields = [
           disc.brand,
           disc.mold,
@@ -992,6 +1078,8 @@ export const discService = {
           disc.stamp_text,
           disc.phone_number,
           disc.name_on_disc,
+          disc.owner_email,
+          disc.owner_pdga_number ? String(disc.owner_pdga_number) : undefined,
           disc.plastic_type,
           disc.disc_type
         ];
@@ -1008,6 +1096,15 @@ export const discService = {
 
         return matchesText || matchesRackId || matchesId;
       });
+
+      // If we have specific rack_id results, ensure they are present (merge/dedupe)
+      if (Array.isArray(rackIdResults) && rackIdResults.length > 0) {
+        const byId = new Map(filteredDiscs.map(d => [d.id, d]));
+        for (const d of rackIdResults) {
+          byId.set(d.id, d);
+        }
+        filteredDiscs = Array.from(byId.values());
+      }
 
       console.log(`Completed single-term search: ${filteredDiscs.length} matching discs out of ${allDiscs.length} total`);
       return {
@@ -1053,6 +1150,8 @@ export const discService = {
             disc.stamp_text,
             disc.phone_number,
             disc.name_on_disc,
+            disc.owner_email,
+            disc.owner_pdga_number ? String(disc.owner_pdga_number) : undefined,
             disc.plastic_type,
             disc.disc_type
           ];
@@ -1131,6 +1230,8 @@ export const discService = {
             disc.stamp_text,
             disc.phone_number,
             disc.name_on_disc,
+            disc.owner_email,
+            disc.owner_pdga_number ? String(disc.owner_pdga_number) : undefined,
             disc.plastic_type,
             disc.disc_type
           ];

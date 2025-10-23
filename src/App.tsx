@@ -86,6 +86,8 @@ function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [selectedDiscId, setSelectedDiscId] = useState<string | null>(null);
   const { user, userRole, signOut, loading } = useAuth();
+  const [globalToast, setGlobalToast] = useState<string | null>(null);
+
 
   const handleNavigate = (page: string, discId?: string) => {
     setCurrentPage(page as Page);
@@ -124,8 +126,9 @@ function AppContent() {
   };
 
   const handleSignOut = async () => {
+    setGlobalToast('Signing out...');
     await signOut();
-    setCurrentPage('home');
+    // signOut triggers a full reload; toast shows briefly before reload
   };
 
   if (loading) {
@@ -141,6 +144,13 @@ function AppContent() {
       </div>
     );
   }
+
+      {/* Global toast (e.g., signing out) */}
+      {globalToast && (
+        <div className="status-message success" style={{ position: 'fixed', top: 64, right: 16, zIndex: 1000 }}>
+          {globalToast}
+        </div>
+      )}
 
   return (
     <div className="app">
@@ -1249,7 +1259,7 @@ function Home({ onNavigate }: HomeProps) {
               type="text"
               value={searchQuery}
               onChange={handleSearchInputChange}
-              placeholder="Search by brand, mold, color, rack ID, location, or any other details (e.g., 'Innova Blue Trespass', 'Hole 7', '417', '#417')"
+              placeholder="Search by ID, brand, mold, color, rack ID, owner email, PDGA number, name on disc, phone, location, or other details (e.g., 'Innova Blue Trespass', 'Hole 7', '417', '#417', 'jane@site.com', '123456')"
               className="hero-search-input"
               autoFocus
             />
