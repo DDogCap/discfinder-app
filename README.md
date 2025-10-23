@@ -1,5 +1,15 @@
 # Getting Started with Create React App
 
+## Serverless SMS setup (Vercel)
+
+The serverless function at `api/send-sms.js` uses TextMagic credentials from environment variables. In your Vercel project settings, add:
+
+- `TEXTMAGIC_USERNAME` = your TextMagic username
+- `TEXTMAGIC_API_KEY` = your TextMagic API key
+
+After adding, redeploy for changes to take effect.
+
+
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
 ## Available Scripts

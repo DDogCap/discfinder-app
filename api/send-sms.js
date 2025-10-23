@@ -3,7 +3,7 @@
  * This handles the CORS issue by making the API call server-side
  */
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   // Only allow POST requests
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
@@ -20,9 +20,9 @@ export default async function handler(req, res) {
       });
     }
 
-    // Get TextMagic credentials (hardcoded for security in serverless function)
-    const TEXTMAGIC_USERNAME = 'galenadams';
-    const TEXTMAGIC_API_KEY = '78DbgMurW9DP0VFnFUTk3nlYrIC42L';
+    // Get TextMagic credentials from environment variables (configure in Vercel)
+    const TEXTMAGIC_USERNAME = process.env.TEXTMAGIC_USERNAME;
+    const TEXTMAGIC_API_KEY = process.env.TEXTMAGIC_API_KEY;
 
     if (!TEXTMAGIC_USERNAME || !TEXTMAGIC_API_KEY) {
       console.error('TextMagic credentials missing:', {
