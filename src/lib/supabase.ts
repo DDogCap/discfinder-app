@@ -976,13 +976,19 @@ export const discService = {
 
         const matchesRackId = isNumericSearch && disc.rack_id === rackIdNum;
 
-        return matchesText || matchesRackId;
+        // Numeric phone match ignoring formatting (e.g., (316) 992-7729 should match 7729)
+        const termDigits = term.replace(/[^0-9]/g, '');
+        const phoneDigits = (disc.phone_number || '').replace(/[^0-9]/g, '');
+        const matchesPhoneDigits = termDigits ? phoneDigits.includes(termDigits) : false;
+
+        return matchesText || matchesRackId || matchesPhoneDigits;
       });
 
-      // If we have specific rack_id results, ensure they are present (merge/dedupe)
-      if (Array.isArray(rackIdResults) && rackIdResults.length > 0) {
+      // Ensure rack_id/phone matches are included (merge/dedupe)
+      const rackList: FoundDisc[] = Array.isArray(rackIdResults) ? (rackIdResults as FoundDisc[]) : [];
+      if (rackList.length > 0) {
         const byId = new Map(filteredDiscs.map(d => [d.id, d]));
-        for (const d of rackIdResults) {
+        for (const d of rackList) {
           byId.set(d.id, d);
         }
         filteredDiscs = Array.from(byId.values());
@@ -1207,13 +1213,19 @@ export const discService = {
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
         const matchesId = uuidRegex.test(term) && disc.id === term;
 
-        return matchesText || matchesRackId || matchesId;
+        // Numeric phone match ignoring formatting
+        const termDigits = term.replace(/[^0-9]/g, '');
+        const phoneDigits = (disc.phone_number || '').replace(/[^0-9]/g, '');
+        const matchesPhoneDigits = termDigits ? phoneDigits.includes(termDigits) : false;
+
+        return matchesText || matchesRackId || matchesId || matchesPhoneDigits;
       });
 
-      // If we have specific rack_id results, ensure they are present (merge/dedupe)
-      if (Array.isArray(rackIdResults) && rackIdResults.length > 0) {
+      // Ensure rack_id/phone matches are included (merge/dedupe)
+      const rackList2: FoundDisc[] = Array.isArray(rackIdResults) ? (rackIdResults as FoundDisc[]) : [];
+      if (rackList2.length > 0) {
         const byId = new Map(filteredDiscs.map(d => [d.id, d]));
-        for (const d of rackIdResults) {
+        for (const d of rackList2) {
           byId.set(d.id, d);
         }
         filteredDiscs = Array.from(byId.values());
@@ -1278,11 +1290,16 @@ export const discService = {
           const rackIdNum = parseInt(cleanTerm);
           const matchesRackId = !isNaN(rackIdNum) && disc.rack_id === rackIdNum;
 
+          // Numeric phone match ignoring formatting
+          const termDigits = term.replace(/[^0-9]/g, '');
+          const phoneDigits = (disc.phone_number || '').replace(/[^0-9]/g, '');
+          const matchesPhoneDigits = termDigits ? phoneDigits.includes(termDigits) : false;
+
           // Direct UUID id match
           const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
           const matchesId = uuidRegex.test(term) && disc.id === term;
 
-          return matchesText || matchesRackId || matchesId;
+          return matchesText || matchesRackId || matchesId || matchesPhoneDigits;
         });
       });
 
@@ -1358,7 +1375,12 @@ export const discService = {
           const rackIdNum = parseInt(cleanTerm);
           const matchesRackId = !isNaN(rackIdNum) && disc.rack_id === rackIdNum;
 
-          return matchesText || matchesRackId;
+          // Numeric phone match ignoring formatting for multi-term chunked
+          const termDigits = term.replace(/[^0-9]/g, '');
+          const phoneDigits = (disc.phone_number || '').replace(/[^0-9]/g, '');
+          const matchesPhoneDigits = termDigits ? phoneDigits.includes(termDigits) : false;
+
+          return matchesText || matchesRackId || matchesPhoneDigits;
         });
       });
 
