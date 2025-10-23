@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { discService, imageService, Source, supabaseService, DiscCondition, DiscType, supabase, Profile } from './lib/supabase';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ImageUpload } from './components/ImageUpload';
@@ -881,6 +881,63 @@ function Home({ onNavigate }: HomeProps) {
   const [recentDiscs, setRecentDiscs] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  // Infinite scroll state for recent discs
+  const RECENT_LIMIT = 24;
+  const [recentHasMore, setRecentHasMore] = useState(false);
+  const [recentNextOffset, setRecentNextOffset] = useState(0);
+  const [isLoadingMoreRecent, setIsLoadingMoreRecent] = useState(false);
+  const loadMoreRef = useRef<HTMLDivElement | null>(null);
+
+  const loadMoreRecentDiscs = async () => {
+    if (hasSearched || !recentHasMore || isLoadingMoreRecent) return;
+    setIsLoadingMoreRecent(true);
+    try {
+      const result = await discService.getFoundDiscs({
+        limit: RECENT_LIMIT,
+        offset: recentNextOffset,
+        fetchAll: false,
+        sortBy: 'newest'
+      });
+      if (!result.error && result.data) {
+        setRecentDiscs(prev => {
+          const merged = [...prev, ...result.data!];
+          const seen = new Set<string>();
+          return merged.filter((d: any) => {
+            if (seen.has(d.id)) return false;
+            seen.add(d.id);
+            return true;
+          });
+        });
+        setRecentHasMore(!!(result as any).hasMore);
+        setRecentNextOffset((result as any).nextOffset || 0);
+      }
+    } catch (e) {
+      console.error('Failed to load more recent discs:', e);
+    } finally {
+      setIsLoadingMoreRecent(false);
+    }
+  };
+
+  // Setup IntersectionObserver for recent discs infinite scroll
+  useEffect(() => {
+    if (hasSearched) return; // Only for recent discs mode
+    const el = loadMoreRef.current;
+    if (!el) return;
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          loadMoreRecentDiscs();
+        }
+      });
+    }, { root: null, rootMargin: '200px', threshold: 0 });
+
+    observer.observe(el);
+    return () => observer.disconnect();
+  // Dependencies limited to stable refs/flags to avoid "used before declared" warning
+  }, [recentHasMore, isLoadingMoreRecent]);
+
+
   const handleNavigateToDetail = (discId: string) => {
     onNavigate('disc-detail', discId);
   };
@@ -925,9 +982,9 @@ function Home({ onNavigate }: HomeProps) {
     const loadRecentDiscs = async () => {
       setIsLoading(true);
       try {
-        // Fetch 24 most recent found discs with status 'Found'
+        // Fetch most recent found discs with paging for infinite scroll
         const result = await discService.getFoundDiscs({
-          limit: 24,
+          limit: RECENT_LIMIT,
           offset: 0,
           fetchAll: false,
           sortBy: 'newest'
@@ -936,12 +993,18 @@ function Home({ onNavigate }: HomeProps) {
         if (result.error) {
           console.error('Error loading recent discs:', result.error);
           setRecentDiscs([]);
+          setRecentHasMore(false);
+          setRecentNextOffset(0);
         } else {
           setRecentDiscs(result.data || []);
+          setRecentHasMore(!!(result as any).hasMore);
+          setRecentNextOffset((result as any).nextOffset || 0);
         }
       } catch (error) {
         console.error('Failed to load recent discs:', error);
         setRecentDiscs([]);
+        setRecentHasMore(false);
+        setRecentNextOffset(0);
       } finally {
         setIsLoading(false);
       }
@@ -1002,7 +1065,7 @@ function Home({ onNavigate }: HomeProps) {
           setIsLoading(true);
           try {
             const result = await discService.getFoundDiscs({
-              limit: 24,
+              limit: RECENT_LIMIT,
               offset: 0,
               fetchAll: false,
               sortBy: 'newest'
@@ -1011,8 +1074,12 @@ function Home({ onNavigate }: HomeProps) {
             if (result.error) {
               console.error('Error loading recent discs:', result.error);
               setRecentDiscs([]);
+              setRecentHasMore(false);
+              setRecentNextOffset(0);
             } else {
               setRecentDiscs(result.data || []);
+              setRecentHasMore(!!(result as any).hasMore);
+              setRecentNextOffset((result as any).nextOffset || 0);
             }
           } catch (error) {
             console.error('Failed to load recent discs:', error);
@@ -1113,6 +1180,12 @@ function Home({ onNavigate }: HomeProps) {
       }
     }, 400); // 400ms debounce delay
   };
+
+	      {/* Intersection Observer sentinel for infinite scroll on Recent Discs */}
+	      {!hasSearched && (
+	        <div ref={loadMoreRef} style={{ height: 1 }} />
+	      )}
+
 
   // Handle search input change
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1410,7 +1483,7 @@ function Home({ onNavigate }: HomeProps) {
             <div className="no-results">No found discs available at this time.</div>
           ) : (
             <div className="disc-grid">
-              {recentDiscs.map((disc) => (
+              {recentDiscs.map((disc, idx) => (
                 <div key={disc.id} className="disc-card">
                   <div className="disc-header">
                     <h4 onClick={() => handleNavigateToDetail(disc.id)}>
@@ -1461,6 +1534,11 @@ function Home({ onNavigate }: HomeProps) {
                         </div>
                       )}
                     </div>
+                  )}
+
+                  {/* Attach sentinel to last card to trigger next page */}
+                  {idx === recentDiscs.length - 1 && !hasSearched && (
+                    <div ref={loadMoreRef} style={{ height: 1 }} />
                   )}
                 </div>
               ))}

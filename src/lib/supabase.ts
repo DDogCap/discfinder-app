@@ -804,6 +804,35 @@ export const discService = {
         }
       }
 
+      // If not a rack_id hit, try a direct UUID (id) match
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(term)) {
+        let { data: idResults, error: idError } = await supabase
+          .from('public_found_discs')
+          .select('*')
+          .eq('id', term);
+
+        if (idError || !idResults) {
+          const result = await supabase
+            .from('found_discs')
+            .select('*')
+            .eq('status', 'active')
+            .eq('id', term);
+          idResults = result.data;
+          idError = result.error;
+        }
+
+        if (!idError && idResults && idResults.length > 0) {
+          return {
+            data: idResults,
+            error: null,
+            count: idResults.length,
+            hasMore: false,
+            nextOffset: 0
+          };
+        }
+      }
+
       // If no exact rack_id match or it's a text search, fall back to full search
       console.log(`Performing full search for term: "${term}"`);
 
@@ -909,6 +938,35 @@ export const discService = {
         }
       }
 
+      // If not a rack_id hit, try a direct UUID (id) match for chunked search
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(term)) {
+        let { data: idResults, error: idError } = await supabase
+          .from('public_found_discs')
+          .select('*')
+          .eq('id', term);
+
+        if (idError || !idResults) {
+          const result = await supabase
+            .from('found_discs')
+            .select('*')
+            .eq('status', 'active')
+            .eq('id', term);
+          idResults = result.data;
+          idError = result.error;
+        }
+
+        if (!idError && idResults && idResults.length > 0) {
+          return {
+            data: idResults,
+            error: null,
+            count: idResults.length,
+            hasMore: false,
+            nextOffset: 0
+          };
+        }
+      }
+
       // If no exact rack_id match or it's a text search, fall back to full search
       console.log(`Performing full chunked search for term: "${term}"`);
 
@@ -944,7 +1002,11 @@ export const discService = {
 
         const matchesRackId = isNumericSearch && disc.rack_id === rackIdNum;
 
-        return matchesText || matchesRackId;
+        // UUID match on id
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        const matchesId = uuidRegex.test(term) && disc.id === term;
+
+        return matchesText || matchesRackId || matchesId;
       });
 
       console.log(`Completed single-term search: ${filteredDiscs.length} matching discs out of ${allDiscs.length} total`);
@@ -1004,7 +1066,11 @@ export const discService = {
           const rackIdNum = parseInt(cleanTerm);
           const matchesRackId = !isNaN(rackIdNum) && disc.rack_id === rackIdNum;
 
-          return matchesText || matchesRackId;
+          // Direct UUID id match
+          const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+          const matchesId = uuidRegex.test(term) && disc.id === term;
+
+          return matchesText || matchesRackId || matchesId;
         });
       });
 
