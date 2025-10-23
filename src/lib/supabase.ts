@@ -768,21 +768,22 @@ export const discService = {
       const rackIdNum = parseInt(cleanTerm);
       const isNumericSearch = !isNaN(rackIdNum);
 
-      // Capture rack_id results to optionally merge with other matches
+      // Capture rack_id and phone_number results to optionally merge with other matches
       let rackIdResults: FoundDisc[] | null | undefined = undefined;
+      let phoneResults: FoundDisc[] | null | undefined = undefined;
 
-      // If it's a numeric search (likely rack_id), try direct rack_id query first
+      // If it's a numeric search (likely rack_id), try direct rack_id query and phone_number substring match
       if (isNumericSearch) {
         console.log(`Searching for rack_id: ${rackIdNum}`);
 
         // Try direct rack_id search first
-        let { data: rackIdResults, error: rackIdError } = await supabase
+        let { data: rackIdData, error: rackIdError } = await supabase
           .from('public_found_discs')
           .select('*')
           .eq('rack_id', rackIdNum);
 
         // If public view doesn't work, try main table
-        if (rackIdError || !rackIdResults) {
+        if (rackIdError || !rackIdData) {
           console.log('Trying main table for rack_id search');
           const result = await supabase
             .from('found_discs')
@@ -790,15 +791,41 @@ export const discService = {
             .eq('status', 'active')
             .eq('rack_id', rackIdNum);
 
-          rackIdResults = result.data;
+          rackIdData = result.data;
           rackIdError = result.error;
         }
 
+        rackIdResults = rackIdData || [];
+
+        // Also search for phone_number substring matches when numeric term
+        const likeTerm = `%${cleanTerm}%`;
+        let { data: phoneData, error: phoneError } = await supabase
+          .from('public_found_discs')
+          .select('*')
+          .ilike('phone_number', likeTerm);
+
+        if (phoneError || !phoneData) {
+          const result = await supabase
+            .from('found_discs')
+            .select('*')
+            .eq('status', 'active')
+            .ilike('phone_number', likeTerm);
+          phoneData = result.data;
+        }
+        phoneResults = phoneData || [];
+
         if (rackIdError) {
           console.error('Rack ID search error:', rackIdError);
-        } else if (rackIdResults && rackIdResults.length > 0) {
-          console.log(`Found ${rackIdResults.length} discs with rack_id ${rackIdNum}`);
-          // Do not return early; we'll merge with phone/email/name matches below
+        }
+
+        // Combine rack_id and phone results now; other OR search will merge further below
+        if (Array.isArray(rackIdResults) || Array.isArray(phoneResults)) {
+          const seen = new Set<string>();
+          const combined = [
+            ...(Array.isArray(rackIdResults) ? rackIdResults : []),
+            ...(Array.isArray(phoneResults) ? phoneResults : [])
+          ].filter(d => (seen.has(d.id) ? false : (seen.add(d.id), true)));
+          rackIdResults = combined; // reuse for later merging with OR
         }
       }
 
@@ -990,8 +1017,9 @@ export const discService = {
 
       console.log(`Searching for single term "${term}" using chunked approach...`);
 
-      // Capture rack_id results to optionally merge with other matches
+      // Capture rack_id and phone_number results to optionally merge with other matches
       let rackIdResults: FoundDisc[] | null | undefined = undefined;
+      let phoneResults: FoundDisc[] | null | undefined = undefined;
 
       // If it's a numeric search (likely rack_id), try direct rack_id query first
       if (isNumericSearch) {
@@ -1018,9 +1046,33 @@ export const discService = {
 
         if (rackIdError) {
           console.error('Rack ID search error:', rackIdError);
-        } else if (rackIdResults && rackIdResults.length > 0) {
-          console.log(`Found ${rackIdResults.length} discs with rack_id ${rackIdNum}`);
-          // Do not return early; continue to include phone/email/name matches
+        }
+
+        // Also search for phone_number substring matches when numeric term
+        const likeTerm = `%${cleanTerm}%`;
+        let { data: phoneData, error: phoneError } = await supabase
+          .from('public_found_discs')
+          .select('*')
+          .ilike('phone_number', likeTerm);
+
+        if (phoneError || !phoneData) {
+          const result = await supabase
+            .from('found_discs')
+            .select('*')
+            .eq('status', 'active')
+            .ilike('phone_number', likeTerm);
+          phoneData = result.data;
+        }
+        phoneResults = phoneData || [];
+
+        // Combine rack_id and phone results
+        if (Array.isArray(rackIdResults) || Array.isArray(phoneResults)) {
+          const seen = new Set<string>();
+          const combined = [
+            ...(Array.isArray(rackIdResults) ? rackIdResults : []),
+            ...(Array.isArray(phoneResults) ? phoneResults : [])
+          ].filter(d => (seen.has(d.id) ? false : (seen.add(d.id), true)));
+          rackIdResults = combined; // reuse for later merging with filtered list
         }
       }
 
@@ -1051,6 +1103,67 @@ export const discService = {
             nextOffset: 0
           };
         }
+      }
+
+      // Try a server-side multi-field search (public view first) for chunked path, then merge with rack_id
+      try {
+        const likeTerm = `%${term}%`;
+        let { data: orData, error: orError } = await supabase
+          .from('public_found_discs')
+          .select('*')
+          .or([
+            `brand.ilike.${likeTerm}`,
+            `mold.ilike.${likeTerm}`,
+            `color.ilike.${likeTerm}`,
+            `location_found.ilike.${likeTerm}`,
+            `description.ilike.${likeTerm}`,
+            `stamp_text.ilike.${likeTerm}`,
+            `phone_number.ilike.${likeTerm}`,
+            `name_on_disc.ilike.${likeTerm}`,
+            `plastic_type.ilike.${likeTerm}`,
+            `disc_type.ilike.${likeTerm}`,
+            `owner_email.ilike.${likeTerm}`
+          ].join(','))
+          .order('created_at', { ascending: false });
+
+        if (orError) {
+          let mainQuery = supabase
+            .from('found_discs')
+            .select('*')
+            .eq('status', 'active')
+            .order('created_at', { ascending: false });
+
+          mainQuery = mainQuery.or([
+            `brand.ilike.${likeTerm}`,
+            `mold.ilike.${likeTerm}`,
+            `color.ilike.${likeTerm}`,
+            `location_found.ilike.${likeTerm}`,
+            `description.ilike.${likeTerm}`,
+            `stamp_text.ilike.${likeTerm}`,
+            `phone_number.ilike.${likeTerm}`,
+            `name_on_disc.ilike.${likeTerm}`,
+            `plastic_type.ilike.${likeTerm}`,
+            `disc_type.ilike.${likeTerm}`,
+            `owner_email.ilike.${likeTerm}`
+          ].join(','));
+
+          const res = await mainQuery;
+          orData = res.data as any[] | null;
+          orError = res.error;
+        }
+
+        if (!orError && orData) {
+          const seen = new Set<string>();
+          const combined = [
+            ...(Array.isArray(rackIdResults) ? rackIdResults : []),
+            ...orData
+          ].filter(d => (seen.has(d.id) ? false : (seen.add(d.id), true)));
+
+          const sorted = this.sortFoundDiscs(combined as any, 'newest');
+          return { data: sorted, error: null, count: sorted.length, hasMore: false, nextOffset: 0 };
+        }
+      } catch (e) {
+        console.warn('Chunked OR search failed; falling back to full fetch');
       }
 
       // If no exact rack_id match or it's a text search, fall back to full search
