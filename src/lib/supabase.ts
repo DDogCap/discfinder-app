@@ -797,22 +797,31 @@ export const discService = {
 
         rackIdResults = rackIdData || [];
 
-        // Also search for phone_number substring matches when numeric term
-        const likeTerm = `%${cleanTerm}%`;
-        let { data: phoneData, error: phoneError } = await supabase
-          .from('public_found_discs')
-          .select('*')
-          .ilike('phone_number', likeTerm);
-
-        if (phoneError || !phoneData) {
-          const result = await supabase
-            .from('found_discs')
-            .select('*')
-            .eq('status', 'active')
-            .ilike('phone_number', likeTerm);
-          phoneData = result.data;
+        // Also search for phone matches via RPC that returns only IDs (guest-safe)
+        const { data: phoneIdRows, error: phoneRpcError } = await supabase
+          .rpc('search_disc_ids_by_phone_digits', { p_digits: cleanTerm });
+        if (phoneRpcError) {
+          console.warn('phone RPC error:', phoneRpcError);
         }
-        phoneResults = phoneData || [];
+        const phoneIdSet = new Set((phoneIdRows || []).map((r: any) => r.id));
+        if (phoneIdSet.size > 0) {
+          // Fetch details for those IDs from the public view if possible, else main table
+          let { data: phoneData, error: phoneFetchError } = await supabase
+            .from('public_found_discs')
+            .select('*')
+            .in('id', Array.from(phoneIdSet));
+          if (phoneFetchError || !phoneData) {
+            const result = await supabase
+              .from('found_discs')
+              .select('*')
+              .eq('status', 'active')
+              .in('id', Array.from(phoneIdSet));
+            phoneData = result.data;
+          }
+          phoneResults = phoneData || [];
+        } else {
+          phoneResults = [];
+        }
 
         if (rackIdError) {
           console.error('Rack ID search error:', rackIdError);
@@ -976,12 +985,16 @@ export const discService = {
 
         const matchesRackId = isNumericSearch && disc.rack_id === rackIdNum;
 
-        // Numeric phone match ignoring formatting (e.g., (316) 992-7729 should match 7729)
+        // Numeric substring match on rack_id
         const termDigits = term.replace(/[^0-9]/g, '');
+        const rackDigits = (disc.rack_id !== undefined && disc.rack_id !== null) ? String(disc.rack_id) : '';
+        const matchesRackDigits = termDigits ? rackDigits.includes(termDigits) : false;
+
+        // Numeric phone match ignoring formatting (e.g., (316) 992-7729 should match 7729)
         const phoneDigits = (disc.phone_number || '').replace(/[^0-9]/g, '');
         const matchesPhoneDigits = termDigits ? phoneDigits.includes(termDigits) : false;
 
-        return matchesText || matchesRackId || matchesPhoneDigits;
+        return matchesText || matchesRackId || matchesRackDigits || matchesPhoneDigits;
       });
 
       // Ensure rack_id/phone matches are included (merge/dedupe)
@@ -1054,22 +1067,31 @@ export const discService = {
           console.error('Rack ID search error:', rackIdError);
         }
 
-        // Also search for phone_number substring matches when numeric term
-        const likeTerm = `%${cleanTerm}%`;
-        let { data: phoneData, error: phoneError } = await supabase
-          .from('public_found_discs')
-          .select('*')
-          .ilike('phone_number', likeTerm);
-
-        if (phoneError || !phoneData) {
-          const result = await supabase
-            .from('found_discs')
-            .select('*')
-            .eq('status', 'active')
-            .ilike('phone_number', likeTerm);
-          phoneData = result.data;
+        // Also search for phone matches via RPC that returns only IDs (guest-safe)
+        const { data: phoneIdRows, error: phoneRpcError } = await supabase
+          .rpc('search_disc_ids_by_phone_digits', { p_digits: cleanTerm });
+        if (phoneRpcError) {
+          console.warn('phone RPC error:', phoneRpcError);
         }
-        phoneResults = phoneData || [];
+        const phoneIdSet = new Set((phoneIdRows || []).map((r: any) => r.id));
+        if (phoneIdSet.size > 0) {
+          // Fetch details for those IDs from the public view if possible, else main table
+          let { data: phoneData, error: phoneFetchError } = await supabase
+            .from('public_found_discs')
+            .select('*')
+            .in('id', Array.from(phoneIdSet));
+          if (phoneFetchError || !phoneData) {
+            const result = await supabase
+              .from('found_discs')
+              .select('*')
+              .eq('status', 'active')
+              .in('id', Array.from(phoneIdSet));
+            phoneData = result.data;
+          }
+          phoneResults = phoneData || [];
+        } else {
+          phoneResults = [];
+        }
 
         // Combine rack_id and phone results
         if (Array.isArray(rackIdResults) || Array.isArray(phoneResults)) {
@@ -1213,12 +1235,14 @@ export const discService = {
         const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
         const matchesId = uuidRegex.test(term) && disc.id === term;
 
-        // Numeric phone match ignoring formatting
+        // Numeric substring match on rack_id and phone ignoring formatting
         const termDigits = term.replace(/[^0-9]/g, '');
+        const rackDigits = (disc.rack_id !== undefined && disc.rack_id !== null) ? String(disc.rack_id) : '';
+        const matchesRackDigits = termDigits ? rackDigits.includes(termDigits) : false;
         const phoneDigits = (disc.phone_number || '').replace(/[^0-9]/g, '');
         const matchesPhoneDigits = termDigits ? phoneDigits.includes(termDigits) : false;
 
-        return matchesText || matchesRackId || matchesId || matchesPhoneDigits;
+        return matchesText || matchesRackId || matchesId || matchesRackDigits || matchesPhoneDigits;
       });
 
       // Ensure rack_id/phone matches are included (merge/dedupe)
@@ -1290,8 +1314,10 @@ export const discService = {
           const rackIdNum = parseInt(cleanTerm);
           const matchesRackId = !isNaN(rackIdNum) && disc.rack_id === rackIdNum;
 
-          // Numeric phone match ignoring formatting
+          // Numeric substring match on rack_id and phone ignoring formatting
           const termDigits = term.replace(/[^0-9]/g, '');
+          const rackDigits = (disc.rack_id !== undefined && disc.rack_id !== null) ? String(disc.rack_id) : '';
+          const matchesRackDigits = termDigits ? rackDigits.includes(termDigits) : false;
           const phoneDigits = (disc.phone_number || '').replace(/[^0-9]/g, '');
           const matchesPhoneDigits = termDigits ? phoneDigits.includes(termDigits) : false;
 
@@ -1299,7 +1325,7 @@ export const discService = {
           const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
           const matchesId = uuidRegex.test(term) && disc.id === term;
 
-          return matchesText || matchesRackId || matchesId || matchesPhoneDigits;
+          return matchesText || matchesRackId || matchesId || matchesRackDigits || matchesPhoneDigits;
         });
       });
 
@@ -1375,12 +1401,14 @@ export const discService = {
           const rackIdNum = parseInt(cleanTerm);
           const matchesRackId = !isNaN(rackIdNum) && disc.rack_id === rackIdNum;
 
-          // Numeric phone match ignoring formatting for multi-term chunked
+          // Numeric substring match on rack_id and phone ignoring formatting (multi-term chunked)
           const termDigits = term.replace(/[^0-9]/g, '');
+          const rackDigits = (disc.rack_id !== undefined && disc.rack_id !== null) ? String(disc.rack_id) : '';
+          const matchesRackDigits = termDigits ? rackDigits.includes(termDigits) : false;
           const phoneDigits = (disc.phone_number || '').replace(/[^0-9]/g, '');
           const matchesPhoneDigits = termDigits ? phoneDigits.includes(termDigits) : false;
 
-          return matchesText || matchesRackId || matchesPhoneDigits;
+          return matchesText || matchesRackId || matchesRackDigits || matchesPhoneDigits;
         });
       });
 
