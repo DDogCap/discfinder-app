@@ -798,27 +798,45 @@ export const discService = {
         rackIdResults = rackIdData || [];
 
         // Also search for phone matches via RPC that returns only IDs (guest-safe)
-        const { data: phoneIdRows, error: phoneRpcError } = await supabase
-          .rpc('search_disc_ids_by_phone_digits', { p_digits: cleanTerm });
-        if (phoneRpcError) {
-          console.warn('phone RPC error:', phoneRpcError);
-        }
-        const phoneIdSet = new Set((phoneIdRows || []).map((r: any) => r.id));
-        if (phoneIdSet.size > 0) {
-          // Fetch details for those IDs from the public view if possible, else main table
-          let { data: phoneData, error: phoneFetchError } = await supabase
-            .from('public_found_discs')
-            .select('*')
-            .in('id', Array.from(phoneIdSet));
-          if (phoneFetchError || !phoneData) {
-            const result = await supabase
-              .from('found_discs')
-              .select('*')
-              .eq('status', 'active')
-              .in('id', Array.from(phoneIdSet));
-            phoneData = result.data;
+        // Page through the phone RPC to bypass 1k row cap
+        const phoneIdSet = new Set<string>();
+        const digits = term.replace(/[^0-9]/g, '');
+        const pageSize = 1000;
+        for (let offsetIds = 0; offsetIds < 10000; offsetIds += pageSize) { // hard cap 10k ids
+          const { data: phoneIdRows, error: phoneRpcError } = await supabase
+            .rpc('search_disc_ids_by_phone_digits', { p_digits: digits, p_offset: offsetIds, p_limit: pageSize });
+          if (phoneRpcError) {
+            console.warn('phone RPC error:', phoneRpcError);
+            break;
           }
-          phoneResults = phoneData || [];
+          if (!phoneIdRows || phoneIdRows.length === 0) break;
+          for (const r of phoneIdRows as any[]) phoneIdSet.add(r.id);
+          if (phoneIdRows.length < pageSize) break;
+        }
+        if (phoneIdSet.size > 0) {
+          // Fetch details for those IDs from the public view if possible, else main table, in chunks to avoid limits
+          const phoneIds = Array.from(phoneIdSet);
+          const phoneDataAgg: any[] = [];
+          const chunkSize = 500;
+          for (let i = 0; i < phoneIds.length; i += chunkSize) {
+            const chunk = phoneIds.slice(i, i + chunkSize);
+            let { data: phoneDataChunk, error: phoneFetchError } = await supabase
+              .from('public_found_discs')
+              .select('*')
+              .in('id', chunk);
+            if (phoneFetchError || !phoneDataChunk) {
+              const result = await supabase
+                .from('found_discs')
+                .select('*')
+                .eq('status', 'active')
+                .in('id', chunk);
+              phoneDataChunk = result.data || [];
+            }
+            if (phoneDataChunk && phoneDataChunk.length > 0) {
+              phoneDataAgg.push(...phoneDataChunk);
+            }
+          }
+          phoneResults = phoneDataAgg;
         } else {
           phoneResults = [];
         }
@@ -1068,27 +1086,45 @@ export const discService = {
         }
 
         // Also search for phone matches via RPC that returns only IDs (guest-safe)
-        const { data: phoneIdRows, error: phoneRpcError } = await supabase
-          .rpc('search_disc_ids_by_phone_digits', { p_digits: cleanTerm });
-        if (phoneRpcError) {
-          console.warn('phone RPC error:', phoneRpcError);
-        }
-        const phoneIdSet = new Set((phoneIdRows || []).map((r: any) => r.id));
-        if (phoneIdSet.size > 0) {
-          // Fetch details for those IDs from the public view if possible, else main table
-          let { data: phoneData, error: phoneFetchError } = await supabase
-            .from('public_found_discs')
-            .select('*')
-            .in('id', Array.from(phoneIdSet));
-          if (phoneFetchError || !phoneData) {
-            const result = await supabase
-              .from('found_discs')
-              .select('*')
-              .eq('status', 'active')
-              .in('id', Array.from(phoneIdSet));
-            phoneData = result.data;
+        // Page through the phone RPC to bypass 1k row cap
+        const phoneIdSet = new Set<string>();
+        const digits = term.replace(/[^0-9]/g, '');
+        const pageSize = 1000;
+        for (let offsetIds = 0; offsetIds < 10000; offsetIds += pageSize) { // hard cap 10k ids
+          const { data: phoneIdRows, error: phoneRpcError } = await supabase
+            .rpc('search_disc_ids_by_phone_digits', { p_digits: digits, p_offset: offsetIds, p_limit: pageSize });
+          if (phoneRpcError) {
+            console.warn('phone RPC error:', phoneRpcError);
+            break;
           }
-          phoneResults = phoneData || [];
+          if (!phoneIdRows || phoneIdRows.length === 0) break;
+          for (const r of phoneIdRows as any[]) phoneIdSet.add(r.id);
+          if (phoneIdRows.length < pageSize) break;
+        }
+        if (phoneIdSet.size > 0) {
+          // Fetch details for those IDs from the public view if possible, else main table, in chunks to avoid limits
+          const phoneIds = Array.from(phoneIdSet);
+          const phoneDataAgg: any[] = [];
+          const chunkSize = 500;
+          for (let i = 0; i < phoneIds.length; i += chunkSize) {
+            const chunk = phoneIds.slice(i, i + chunkSize);
+            let { data: phoneDataChunk, error: phoneFetchError } = await supabase
+              .from('public_found_discs')
+              .select('*')
+              .in('id', chunk);
+            if (phoneFetchError || !phoneDataChunk) {
+              const result = await supabase
+                .from('found_discs')
+                .select('*')
+                .eq('status', 'active')
+                .in('id', chunk);
+              phoneDataChunk = result.data || [];
+            }
+            if (phoneDataChunk && phoneDataChunk.length > 0) {
+              phoneDataAgg.push(...phoneDataChunk);
+            }
+          }
+          phoneResults = phoneDataAgg;
         } else {
           phoneResults = [];
         }
