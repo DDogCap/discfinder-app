@@ -687,6 +687,7 @@ function DiscDetail({ discId, onNavigate }: DiscDetailProps) {
   const { userRole } = useAuth();
   const [isUpdating, setIsUpdating] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [copyToastMessage, setCopyToastMessage] = useState<string | null>(null);
 
   const handleMarkReturned = async () => {
     try {
@@ -708,6 +709,33 @@ function DiscDetail({ discId, onNavigate }: DiscDetailProps) {
       setStatusMessage('Failed to mark as returned');
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleThisIsMyDisc = async () => {
+    if (!disc) return;
+
+    // Build the disc info string (same format as h1)
+    const discInfo = `${disc.rack_id ? `#${disc.rack_id} ` : ''}${disc.brand && disc.brand.toLowerCase() !== 'not specified' ? `${disc.brand} ` : ''}${disc.mold || 'Unknown Mold'}`;
+
+    try {
+      // Copy to clipboard
+      await navigator.clipboard.writeText(discInfo);
+
+      // Show toast notification
+      setCopyToastMessage('Disc info copied to clipboard');
+
+      // Wait 1 second, then navigate
+      setTimeout(() => {
+        window.location.href = 'https://www.dzdiscs.com/products/ship-me-my-lost-now-found-disc';
+      }, 1000);
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error);
+      // Still navigate even if copy fails
+      setCopyToastMessage('Navigating to shipping page...');
+      setTimeout(() => {
+        window.location.href = 'https://www.dzdiscs.com/products/ship-me-my-lost-now-found-disc';
+      }, 1000);
     }
   };
   useEffect(() => {
@@ -876,8 +904,26 @@ function DiscDetail({ discId, onNavigate }: DiscDetailProps) {
               </div>
             )}
           </div>
+
+          {/* This is my disc button */}
+          <div style={{ marginTop: '1.5rem', paddingTop: '1.5rem', borderTop: '1px solid #e5e7eb' }}>
+            <button
+              className="button primary"
+              onClick={handleThisIsMyDisc}
+              style={{ width: '100%', fontSize: '1rem', padding: '0.75rem 1rem' }}
+            >
+              This is my disc!
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Copy toast notification */}
+      {copyToastMessage && (
+        <div className="return-success-toast">
+          {copyToastMessage}
+        </div>
+      )}
     </div>
   );
 }
