@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { discService, imageService, Source, supabaseService, DiscCondition, DiscType, supabase, Profile } from './lib/supabase';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ImageUpload } from './components/ImageUpload';
@@ -145,6 +145,8 @@ function AppContent() {
     );
   }
 
+  return (
+    <div className="app">
       {/* Global toast (e.g., signing out) */}
       {globalToast && (
         <div className="status-message success" style={{ position: 'fixed', top: 64, right: 16, zIndex: 1000 }}>
@@ -152,8 +154,6 @@ function AppContent() {
         </div>
       )}
 
-  return (
-    <div className="app">
       <nav className="navbar bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
         <div className="nav-container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="logo text-xl font-bold text-blue-600 cursor-pointer py-2" onClick={() => setCurrentPage('home')}>
@@ -990,7 +990,7 @@ function Home({ onNavigate }: HomeProps) {
 
     observer.observe(el);
     return () => observer.disconnect();
-  // Dependencies limited to stable refs/flags to avoid "used before declared" warning
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recentHasMore, isLoadingMoreRecent]);
 
 
@@ -1236,12 +1236,6 @@ function Home({ onNavigate }: HomeProps) {
       }
     }, 400); // 400ms debounce delay
   };
-
-	      {/* Intersection Observer sentinel for infinite scroll on Recent Discs */}
-	      {!hasSearched && (
-	        <div ref={loadMoreRef} style={{ height: 1 }} />
-	      )}
-
 
   // Handle search input change
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
