@@ -535,10 +535,6 @@
     @apply absolute top-full right-0 mt-1 bg-white rounded-lg shadow-lg border border-gray-200 min-w-48 z-20 hidden;
   }
 
-  .image-menu:hover .image-menu-dropdown {
-    @apply block;
-  }
-
   /* FAQ Styles */
   .faq-list {
     @apply space-y-4;

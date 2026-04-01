@@ -1031,6 +1031,21 @@ function Home({ onNavigate }: HomeProps) {
   // Success message state for return confirmations
   const [returnSuccessMessage, setReturnSuccessMessage] = useState('');
 
+  // Admin rack ID range search
+  const [rackIdRangeInput, setRackIdRangeInput] = useState('');
+  const [activeRackIdRange, setActiveRackIdRange] = useState<{ min: number; max: number } | null>(null);
+
+  // Track which disc's 3-dot menu is open
+  const [openMenuDiscId, setOpenMenuDiscId] = useState<string | null>(null);
+
+  // Close menu on outside click
+  useEffect(() => {
+    if (!openMenuDiscId) return;
+    const handleOutsideClick = () => setOpenMenuDiscId(null);
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, [openMenuDiscId]);
+
   // Debounce timer ref
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -1252,14 +1267,68 @@ function Home({ onNavigate }: HomeProps) {
     setTotalCount(0);
     setHasMore(false);
     setCurrentPage(1);
+    setActiveRackIdRange(null);
+    setRackIdRangeInput('');
     if (debounceTimerRef.current) {
       clearTimeout(debounceTimerRef.current);
     }
   };
 
+  // Admin rack ID range search
+  const performRangeSearch = async (min: number, max: number, page: number = 1) => {
+    setIsSearching(true);
+    setHasSearched(true);
+    setCurrentPage(page);
+    setSearchQuery('');
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+
+    try {
+      const offset = (page - 1) * resultsPerPage;
+      const options = showAllResults
+        ? { fetchAll: true, minRackId: min, maxRackId: max, sortBy: 'rack_id_asc' as const }
+        : { limit: resultsPerPage, offset, fetchAll: false, minRackId: min, maxRackId: max, sortBy: 'rack_id_asc' as const };
+
+      const result = await discService.searchFoundDiscsWithQuery('', options);
+
+      if (result.error) {
+        setFoundDiscs([]);
+        setTotalCount(0);
+        setHasMore(false);
+      } else {
+        setFoundDiscs(result.data || []);
+        if (showAllResults) {
+          setTotalCount(result.data?.length || 0);
+          setHasMore(false);
+        } else {
+          setTotalCount('count' in result ? result.count || 0 : 0);
+          setHasMore('hasMore' in result ? result.hasMore || false : false);
+        }
+      }
+    } catch (error) {
+      console.error('Range search failed:', error);
+      setFoundDiscs([]);
+      setTotalCount(0);
+      setHasMore(false);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleRangeSearch = () => {
+    const match = rackIdRangeInput.trim().match(/^(\d+)\s*[-–]\s*(\d+)$/);
+    if (!match) return;
+    const min = parseInt(match[1], 10);
+    const max = parseInt(match[2], 10);
+    if (min > max) return;
+    setActiveRackIdRange({ min, max });
+    performRangeSearch(min, max, 1);
+  };
+
   // Pagination functions
   const handlePageChange = (newPage: number) => {
-    if (searchQuery.trim()) {
+    if (activeRackIdRange) {
+      performRangeSearch(activeRackIdRange.min, activeRackIdRange.max, newPage);
+    } else if (searchQuery.trim()) {
       performSearch(searchQuery.trim(), newPage);
     }
   };
@@ -1267,8 +1336,9 @@ function Home({ onNavigate }: HomeProps) {
   const toggleShowAllResults = () => {
     setShowAllResults(!showAllResults);
     setCurrentPage(1);
-    // Re-run the current search with new setting
-    if (searchQuery.trim()) {
+    if (activeRackIdRange) {
+      performRangeSearch(activeRackIdRange.min, activeRackIdRange.max, 1);
+    } else if (searchQuery.trim()) {
       performSearch(searchQuery.trim(), 1);
     }
   };
@@ -1315,7 +1385,33 @@ function Home({ onNavigate }: HomeProps) {
             )}
           </div>
 
-
+          {/* Admin: Rack ID range search */}
+          {userRole === 'admin' && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+              <label style={{ fontSize: '0.85rem', color: '#6b7280', whiteSpace: 'nowrap' }}>Show discs in range:</label>
+              <input
+                type="text"
+                value={rackIdRangeInput}
+                onChange={(e) => setRackIdRangeInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleRangeSearch(); }}
+                placeholder="e.g. 5016-5250"
+                style={{ width: '130px', padding: '6px 10px', border: '1px solid #d1d5db', borderRadius: '6px', fontSize: '0.9rem' }}
+              />
+              <button
+                onClick={handleRangeSearch}
+                disabled={isSearching || !/^\d+\s*[-–]\s*\d+$/.test(rackIdRangeInput.trim())}
+                className="primary-button"
+                style={{ padding: '6px 14px', fontSize: '0.85rem' }}
+              >
+                Go
+              </button>
+              {activeRackIdRange && (
+                <button onClick={clearSearch} className="secondary-button" style={{ padding: '6px 14px', fontSize: '0.85rem' }}>
+                  Clear
+                </button>
+              )}
+            </div>
+          )}
 
         </div>
       </div>
@@ -1329,11 +1425,19 @@ function Home({ onNavigate }: HomeProps) {
               {isSearching ? (
                 'Searching...'
               ) : foundDiscs.length > 0 ? (
-                showAllResults
-                  ? `Found ${foundDiscs.length} disc${foundDiscs.length === 1 ? '' : 's'} (showing all)`
-                  : `Found ${foundDiscs.length} disc${foundDiscs.length === 1 ? '' : 's'} (page ${currentPage}${totalCount > 0 ? ` of ${Math.ceil(totalCount / resultsPerPage)}` : ''})`
+                activeRackIdRange ? (
+                  showAllResults
+                    ? `${foundDiscs.length} disc${foundDiscs.length === 1 ? '' : 's'} in rack #${activeRackIdRange.min}–#${activeRackIdRange.max}`
+                    : `${foundDiscs.length} disc${foundDiscs.length === 1 ? '' : 's'} in rack #${activeRackIdRange.min}–#${activeRackIdRange.max} (page ${currentPage}${totalCount > 0 ? ` of ${Math.ceil(totalCount / resultsPerPage)}` : ''})`
+                ) : (
+                  showAllResults
+                    ? `Found ${foundDiscs.length} disc${foundDiscs.length === 1 ? '' : 's'} (showing all)`
+                    : `Found ${foundDiscs.length} disc${foundDiscs.length === 1 ? '' : 's'} (page ${currentPage}${totalCount > 0 ? ` of ${Math.ceil(totalCount / resultsPerPage)}` : ''})`
+                )
               ) : (
-                'No discs found matching your criteria'
+                activeRackIdRange
+                  ? `No discs found in rack #${activeRackIdRange.min}–#${activeRackIdRange.max}`
+                  : 'No discs found matching your criteria'
               )}
             </h3>
 
@@ -1406,27 +1510,32 @@ function Home({ onNavigate }: HomeProps) {
                       {/* 3-dot menu for return status - admin only */}
                       {userRole === 'admin' && (
                         <div className="image-menu">
-                          <button className="image-menu-button">⋯</button>
-                          <div className="image-menu-dropdown">
-                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Returned to Owner')}>
-                              Return to Owner
+                          <button
+                            className="image-menu-button"
+                            onClick={(e) => { e.stopPropagation(); setOpenMenuDiscId(openMenuDiscId === disc.id ? null : disc.id); }}
+                          >⋯</button>
+                          {openMenuDiscId === disc.id && (
+                            <div className="image-menu-dropdown" style={{ display: 'block' }}>
+                              <div className="image-menu-item" onClick={() => { handleReturnStatusUpdate(disc.id, 'Returned to Owner'); setOpenMenuDiscId(null); }}>
+                                Return to Owner
+                              </div>
+                              <div className="image-menu-item" onClick={() => { handleReturnStatusUpdate(disc.id, 'Found'); setOpenMenuDiscId(null); }}>
+                                Mark as Found
+                              </div>
+                              <div className="image-menu-item" onClick={() => { handleReturnStatusUpdate(disc.id, 'Donated'); setOpenMenuDiscId(null); }}>
+                                Donated
+                              </div>
+                              <div className="image-menu-item" onClick={() => { handleReturnStatusUpdate(disc.id, 'Sold'); setOpenMenuDiscId(null); }}>
+                                Sold
+                              </div>
+                              <div className="image-menu-item" onClick={() => { handleReturnStatusUpdate(disc.id, 'For Sale Used'); setOpenMenuDiscId(null); }}>
+                                For Sale Used
+                              </div>
+                              <div className="image-menu-item" onClick={() => { handleReturnStatusUpdate(disc.id, 'Trashed'); setOpenMenuDiscId(null); }}>
+                                Trashed
+                              </div>
                             </div>
-                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Found')}>
-                              Mark as Found
-                            </div>
-                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Donated')}>
-                              Donated
-                            </div>
-                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Sold')}>
-                              Sold
-                            </div>
-                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'For Sale Used')}>
-                              For Sale Used
-                            </div>
-                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Trashed')}>
-                              Trashed
-                            </div>
-                          </div>
+                          )}
                         </div>
                       )}
                     </div>
@@ -1560,27 +1669,32 @@ function Home({ onNavigate }: HomeProps) {
                       {/* 3-dot menu for return status - admin only */}
                       {userRole === 'admin' && (
                         <div className="image-menu">
-                          <button className="image-menu-button">⋯</button>
-                          <div className="image-menu-dropdown">
-                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Returned to Owner')}>
-                              Return to Owner
+                          <button
+                            className="image-menu-button"
+                            onClick={(e) => { e.stopPropagation(); setOpenMenuDiscId(openMenuDiscId === disc.id ? null : disc.id); }}
+                          >⋯</button>
+                          {openMenuDiscId === disc.id && (
+                            <div className="image-menu-dropdown" style={{ display: 'block' }}>
+                              <div className="image-menu-item" onClick={() => { handleReturnStatusUpdate(disc.id, 'Returned to Owner'); setOpenMenuDiscId(null); }}>
+                                Return to Owner
+                              </div>
+                              <div className="image-menu-item" onClick={() => { handleReturnStatusUpdate(disc.id, 'Found'); setOpenMenuDiscId(null); }}>
+                                Mark as Found
+                              </div>
+                              <div className="image-menu-item" onClick={() => { handleReturnStatusUpdate(disc.id, 'Donated'); setOpenMenuDiscId(null); }}>
+                                Donated
+                              </div>
+                              <div className="image-menu-item" onClick={() => { handleReturnStatusUpdate(disc.id, 'Sold'); setOpenMenuDiscId(null); }}>
+                                Sold
+                              </div>
+                              <div className="image-menu-item" onClick={() => { handleReturnStatusUpdate(disc.id, 'For Sale Used'); setOpenMenuDiscId(null); }}>
+                                For Sale Used
+                              </div>
+                              <div className="image-menu-item" onClick={() => { handleReturnStatusUpdate(disc.id, 'Trashed'); setOpenMenuDiscId(null); }}>
+                                Trashed
+                              </div>
                             </div>
-                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Found')}>
-                              Mark as Found
-                            </div>
-                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Donated')}>
-                              Donated
-                            </div>
-                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Sold')}>
-                              Sold
-                            </div>
-                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'For Sale Used')}>
-                              For Sale Used
-                            </div>
-                            <div className="image-menu-item" onClick={() => handleReturnStatusUpdate(disc.id, 'Trashed')}>
-                              Trashed
-                            </div>
-                          </div>
+                          )}
                         </div>
                       )}
                     </div>
