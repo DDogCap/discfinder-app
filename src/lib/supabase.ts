@@ -272,6 +272,62 @@ export const discService = {
     }
   },
 
+  // Admin-only: get discs in a rack_id range regardless of return_status
+  async getFoundDiscsInRangeAllStatuses(min: number, max: number, options: {
+    limit?: number;
+    offset?: number;
+    fetchAll?: boolean;
+  } = {}) {
+    try {
+      const { limit = 500, offset = 0, fetchAll = false } = options;
+
+      if (fetchAll) {
+        // Fetch all in range using chunking
+        const allDiscs: FoundDisc[] = [];
+        let chunkOffset = 0;
+        const chunkSize = 1000;
+        let hasMore = true;
+
+        while (hasMore) {
+          const { data, error } = await supabase
+            .from('found_discs')
+            .select('*')
+            .eq('status', 'active')
+            .gte('rack_id', min)
+            .lte('rack_id', max)
+            .order('rack_id', { ascending: true })
+            .range(chunkOffset, chunkOffset + chunkSize - 1);
+
+          if (error) throw error;
+          if (data && data.length > 0) {
+            allDiscs.push(...data);
+            hasMore = data.length === chunkSize;
+            chunkOffset += chunkSize;
+          } else {
+            hasMore = false;
+          }
+        }
+
+        return { data: allDiscs, error: null, count: allDiscs.length, hasMore: false, nextOffset: 0 };
+      } else {
+        const { data, error, count } = await supabase
+          .from('found_discs')
+          .select('*', { count: 'exact' })
+          .eq('status', 'active')
+          .gte('rack_id', min)
+          .lte('rack_id', max)
+          .order('rack_id', { ascending: true })
+          .range(offset, offset + limit - 1);
+
+        if (error) throw error;
+        return { data, error: null, count, hasMore: !!(data && data.length === limit), nextOffset: offset + limit };
+      }
+    } catch (error) {
+      console.error('Error fetching found discs in range (all statuses):', error);
+      return { data: null, error, count: 0, hasMore: false, nextOffset: 0 };
+    }
+  },
+
   // Get all active found discs with chunking to handle large datasets
   async getFoundDiscs(options: {
     limit?: number;

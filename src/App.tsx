@@ -798,20 +798,22 @@ function DiscDetail({ discId, onNavigate }: DiscDetailProps) {
             {disc.mold || 'Unknown Mold'}
           </h1>
         </div>
-        {userRole === 'admin' && (
-          <div className="disc-detail-admin-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            {disc.return_status && (
-              <span className="status-badge" style={{ padding: '0.25rem 0.5rem', borderRadius: '9999px', background: '#eef2ff', color: '#3730a3', fontSize: '0.75rem', fontWeight: 600 }}>
-                {disc.return_status}
-              </span>
-            )}
-            {disc.return_status !== 'Returned to Owner' && (
-              <button className="button primary" onClick={handleMarkReturned} disabled={isUpdating}>
-                {isUpdating ? 'Updating…' : 'Return to Owner'}
-              </button>
-            )}
-          </div>
-        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+          {disc.return_status && disc.return_status !== 'Found' && (
+            <span style={{ padding: '0.25rem 0.75rem', borderRadius: '9999px', background: '#fef3c7', color: '#92400e', fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.02em' }}>
+              {disc.return_status}
+            </span>
+          )}
+          {userRole === 'admin' && (
+            <div className="disc-detail-admin-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {disc.return_status !== 'Returned to Owner' && (
+                <button className="button primary" onClick={handleMarkReturned} disabled={isUpdating}>
+                  {isUpdating ? 'Updating…' : 'Return to Owner'}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
       </div>
       {statusMessage && (
         <div className="return-success-toast" style={{ marginTop: '0.5rem' }}>
@@ -1034,6 +1036,7 @@ function Home({ onNavigate }: HomeProps) {
   // Admin rack ID range search
   const [rackIdRangeInput, setRackIdRangeInput] = useState('');
   const [activeRackIdRange, setActiveRackIdRange] = useState<{ min: number; max: number } | null>(null);
+  const [showReturnedDiscs, setShowReturnedDiscs] = useState(false);
 
   // Track which disc's 3-dot menu is open
   const [openMenuDiscId, setOpenMenuDiscId] = useState<string | null>(null);
@@ -1275,7 +1278,7 @@ function Home({ onNavigate }: HomeProps) {
   };
 
   // Admin rack ID range search
-  const performRangeSearch = async (min: number, max: number, page: number = 1) => {
+  const performRangeSearch = async (min: number, max: number, page: number = 1, includeAllStatuses: boolean = showReturnedDiscs) => {
     setIsSearching(true);
     setHasSearched(true);
     setCurrentPage(page);
@@ -1284,11 +1287,20 @@ function Home({ onNavigate }: HomeProps) {
 
     try {
       const offset = (page - 1) * resultsPerPage;
-      const options = showAllResults
-        ? { fetchAll: true, minRackId: min, maxRackId: max, sortBy: 'rack_id_asc' as const }
-        : { limit: resultsPerPage, offset, fetchAll: false, minRackId: min, maxRackId: max, sortBy: 'rack_id_asc' as const };
+      let result;
 
-      const result = await discService.searchFoundDiscsWithQuery('', options);
+      if (includeAllStatuses) {
+        result = await discService.getFoundDiscsInRangeAllStatuses(min, max, {
+          fetchAll: showAllResults,
+          limit: resultsPerPage,
+          offset,
+        });
+      } else {
+        const options = showAllResults
+          ? { fetchAll: true, minRackId: min, maxRackId: max, sortBy: 'rack_id_asc' as const }
+          : { limit: resultsPerPage, offset, fetchAll: false, minRackId: min, maxRackId: max, sortBy: 'rack_id_asc' as const };
+        result = await discService.searchFoundDiscsWithQuery('', options);
+      }
 
       if (result.error) {
         setFoundDiscs([]);
@@ -1387,7 +1399,7 @@ function Home({ onNavigate }: HomeProps) {
 
           {/* Admin: Rack ID range search */}
           {userRole === 'admin' && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
               <label style={{ fontSize: '0.85rem', color: '#6b7280', whiteSpace: 'nowrap' }}>Show discs in range:</label>
               <input
                 type="text"
@@ -1405,6 +1417,19 @@ function Home({ onNavigate }: HomeProps) {
               >
                 Go
               </button>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', color: '#6b7280', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <input
+                  type="checkbox"
+                  checked={showReturnedDiscs}
+                  onChange={(e) => {
+                    setShowReturnedDiscs(e.target.checked);
+                    if (activeRackIdRange) {
+                      performRangeSearch(activeRackIdRange.min, activeRackIdRange.max, 1, e.target.checked);
+                    }
+                  }}
+                />
+                Include returned discs
+              </label>
               {activeRackIdRange && (
                 <button onClick={clearSearch} className="secondary-button" style={{ padding: '6px 14px', fontSize: '0.85rem' }}>
                   Clear
@@ -1493,6 +1518,14 @@ function Home({ onNavigate }: HomeProps) {
                       {disc.mold || 'Unknown Mold'}
                     </h4>
                   </div>
+
+                  {disc.return_status && disc.return_status !== 'Found' && (
+                    <div style={{ marginBottom: '4px' }}>
+                      <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '9999px', fontSize: '0.7rem', fontWeight: 600, background: '#fef3c7', color: '#92400e' }}>
+                        {disc.return_status}
+                      </span>
+                    </div>
+                  )}
 
                   <div className="disc-subheader">
                     {disc.name_on_disc || ''}
