@@ -13,6 +13,7 @@ import SourceManager from './components/SourceManager';
 import { sendFoundDiscNotification, validatePhoneForSMS } from './lib/smsService';
 import OptimizedImage from './components/OptimizedImage';
 import ImageModal from './components/ImageModal';
+import { DiscEditForm } from './components/DiscEditForm';
 
 
 type Page = 'home' | 'report-found' | 'login' | 'admin' | 'rakerdiver' | 'admin-bulk-turnins' | 'profile-import' | 'profile' | 'photo-migration' | 'disc-detail' | 'faq';
@@ -82,18 +83,53 @@ function FAQ() {
   );
 }
 
+// Disc detail pages live at /disc/<id>; every other page is at /
+function discIdFromPath(pathname: string): string | null {
+  const match = pathname.match(/^\/disc\/([^/]+)\/?$/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 function AppContent() {
-  const [currentPage, setCurrentPage] = useState<Page>('home');
-  const [selectedDiscId, setSelectedDiscId] = useState<string | null>(null);
+  const initialDiscId = discIdFromPath(window.location.pathname);
+  const [currentPage, setCurrentPageState] = useState<Page>(initialDiscId ? 'disc-detail' : 'home');
+  const [selectedDiscId, setSelectedDiscId] = useState<string | null>(initialDiscId);
   const { user, userRole, signOut, loading } = useAuth();
   const [globalToast, setGlobalToast] = useState<string | null>(null);
 
+  // Home restores its own scroll position, so keep the browser from fighting it
+  useEffect(() => {
+    if ('scrollRestoration' in window.history) window.history.scrollRestoration = 'manual';
+  }, []);
+
+  // Browser back/forward between / and /disc/<id>
+  useEffect(() => {
+    const onPopState = () => {
+      const discId = discIdFromPath(window.location.pathname);
+      if (discId) {
+        setSelectedDiscId(discId);
+        setCurrentPageState('disc-detail');
+      } else {
+        setCurrentPageState(prev => (prev === 'disc-detail' ? 'home' : prev));
+      }
+    };
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  const setCurrentPage = (page: Page) => {
+    setCurrentPageState(page);
+    if (window.location.pathname !== '/') window.history.pushState(null, '', '/');
+  };
 
   const handleNavigate = (page: string, discId?: string) => {
-    setCurrentPage(page as Page);
-    if (discId) {
+    if (page === 'disc-detail' && discId) {
       setSelectedDiscId(discId);
+      setCurrentPageState('disc-detail');
+      // fromApp lets the detail page's Back button use history.back() instead of stacking entries
+      window.history.pushState({ fromApp: true }, '', `/disc/${encodeURIComponent(discId)}`);
+      return;
     }
+    setCurrentPage(page as Page);
   };
 
   const renderPage = () => {
@@ -688,6 +724,22 @@ function DiscDetail({ discId, onNavigate }: DiscDetailProps) {
   const [isUpdating, setIsUpdating] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [copyToastMessage, setCopyToastMessage] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // Back to the search we came from (restores its state), or home when opened from a link
+  const goBack = () => {
+    if (window.history.state?.fromApp) {
+      window.history.back();
+    } else {
+      onNavigate('home');
+    }
+  };
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    setIsEditing(false);
+  }, [discId]);
 
   const handleMarkReturned = async () => {
     try {
@@ -762,7 +814,7 @@ function DiscDetail({ discId, onNavigate }: DiscDetailProps) {
     if (discId) {
       loadDisc();
     }
-  }, [discId]);
+  }, [discId, reloadKey]);
 
   if (isLoading) {
     return (
@@ -777,7 +829,7 @@ function DiscDetail({ discId, onNavigate }: DiscDetailProps) {
       <div className="main-container">
         <div className="error-message">
           <p>{error || 'Disc not found'}</p>
-          <button className="button secondary" onClick={() => onNavigate('home')}>
+          <button className="button secondary" onClick={goBack}>
             Back to Home
           </button>
         </div>
@@ -789,7 +841,7 @@ function DiscDetail({ discId, onNavigate }: DiscDetailProps) {
     <div className="main-container">
       <div className="disc-detail-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
         <div className="disc-detail-header-left" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button className="button secondary" onClick={() => onNavigate('home')}>
+          <button className="button secondary" onClick={goBack}>
             ← Back to Search
           </button>
           <h1 style={{ margin: 0 }}>
@@ -806,7 +858,12 @@ function DiscDetail({ discId, onNavigate }: DiscDetailProps) {
           )}
           {userRole === 'admin' && (
             <div className="disc-detail-admin-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              {disc.return_status !== 'Returned to Owner' && (
+              {!isEditing && (
+                <button className="button secondary" onClick={() => { setStatusMessage(null); setIsEditing(true); }}>
+                  Edit
+                </button>
+              )}
+              {!isEditing && disc.return_status !== 'Returned to Owner' && (
                 <button className="button primary" onClick={handleMarkReturned} disabled={isUpdating}>
                   {isUpdating ? 'Updating…' : 'Return to Owner'}
                 </button>
@@ -821,6 +878,17 @@ function DiscDetail({ discId, onNavigate }: DiscDetailProps) {
         </div>
       )}
 
+      {isEditing && userRole === 'admin' ? (
+        <DiscEditForm
+          discId={discId}
+          onCancel={() => setIsEditing(false)}
+          onSaved={() => {
+            setIsEditing(false);
+            setStatusMessage('Changes saved');
+            setReloadKey(k => k + 1);
+          }}
+        />
+      ) : (
       <div className="disc-detail-content">
         {/* Images */}
         {disc.image_urls && disc.image_urls.length > 0 && (
@@ -919,6 +987,7 @@ function DiscDetail({ discId, onNavigate }: DiscDetailProps) {
           </div>
         </div>
       </div>
+      )}
 
       {/* Copy toast notification */}
       {copyToastMessage && (
@@ -1423,9 +1492,12 @@ function Home({ onNavigate }: HomeProps) {
     }
   };
 
-  // Re-run a saved search when returning to Home
+  // Re-run a saved search when returning to Home (once: a second run would flash the
+  // loading state and undo the scroll restore)
+  const restoreStartedRef = useRef(false);
   useEffect(() => {
-    if (!savedSearch) return;
+    if (!savedSearch || restoreStartedRef.current) return;
+    restoreStartedRef.current = true;
     if (savedSearch.range) {
       performRangeSearch(savedSearch.range.min, savedSearch.range.max, savedSearch.page, savedSearch.includeReturned);
     } else {
@@ -1440,7 +1512,7 @@ function Home({ onNavigate }: HomeProps) {
     if (isSearching || pendingScrollYRef.current === undefined) return;
     const y = pendingScrollYRef.current;
     pendingScrollYRef.current = undefined;
-    requestAnimationFrame(() => window.scrollTo(0, y));
+    window.scrollTo(0, y);
   }, [isSearching, foundDiscs]);
 
   // Re-run the current search when the 'For Sale Used' filter changes

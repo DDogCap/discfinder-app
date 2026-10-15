@@ -60,7 +60,7 @@ export interface Source {
   updated_by?: string
 }
 
-export type DiscCondition = 'excellent' | 'good' | 'fair' | 'poor'
+export type DiscCondition = 'new' | 'excellent' | 'good' | 'fair' | 'poor' | 'not specified'
 export type DiscType = 'putter' | 'approach' | 'midrange' | 'fairway_driver' | 'distance_driver'
 
 export interface FoundDisc {
@@ -1607,6 +1607,42 @@ export const discService = {
     } catch (error) {
       console.error('Error fetching admin found discs:', error);
       return { data: null, error };
+    }
+  },
+
+  // Admin: full found_discs row for editing (the public view lacks source_id and some statuses)
+  async getFoundDiscForEdit(discId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('found_discs')
+        .select('*')
+        .eq('id', discId)
+        .single();
+
+      if (error) throw error;
+      return { data: data as FoundDisc, error: null };
+    } catch (error) {
+      console.error('Error fetching found disc for edit:', error);
+      return { data: null, error };
+    }
+  },
+
+  // Admin: update a found disc's details (RLS limits this to admins and the disc's finder)
+  async updateFoundDisc(discId: string, updates: Partial<Record<keyof FoundDisc, unknown>>) {
+    try {
+      const { data, error } = await supabase
+        .from('found_discs')
+        .update({ ...updates, updated_at: new Date().toISOString() })
+        .eq('id', discId)
+        .select('id');
+
+      if (error) throw error;
+      // RLS-blocked updates don't error, they just match no rows
+      if (!data || data.length === 0) throw new Error('Not allowed to edit this disc');
+      return { success: true, error: null };
+    } catch (error) {
+      console.error('Error updating found disc:', error);
+      return { success: false, error };
     }
   },
 
