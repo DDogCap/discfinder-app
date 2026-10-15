@@ -197,6 +197,16 @@ function numericSearchDigits(term: string): string {
   return /^[\d\s#()+.-]+$/.test(term) ? term.replace(/[^0-9]/g, '') : '';
 }
 
+function orderForSort(sortBy: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc'): { column: string; ascending: boolean } {
+  switch (sortBy) {
+    case 'oldest': return { column: 'created_at', ascending: true };
+    case 'rack_id_asc': return { column: 'rack_id', ascending: true };
+    case 'rack_id_desc': return { column: 'rack_id', ascending: false };
+    case 'newest':
+    default: return { column: 'created_at', ascending: false };
+  }
+}
+
 function excludeForSaleUsed<T extends { return_status?: ReturnStatus | null }>(discs: T[], includeForSaleUsed: boolean): T[] {
   return includeForSaleUsed ? discs : discs.filter(d => d.return_status !== FOR_SALE_USED);
 }
@@ -987,76 +997,55 @@ export const discService = {
       // Try a server-side multi-field search (public view first)
       try {
         const likeTerm = `%${term}%`;
-        // Public view OR search across common text fields including owner-related fields
-        let { data: orData, error: orError } = await supabase
-          .from('public_found_discs')
-          .select('*')
-          .or(
-            [
-              `brand.ilike.${likeTerm}`,
-              `mold.ilike.${likeTerm}`,
-              `color.ilike.${likeTerm}`,
-              `location_found.ilike.${likeTerm}`,
-              `description.ilike.${likeTerm}`,
-              `stamp_text.ilike.${likeTerm}`,
-              `phone_number.ilike.${likeTerm}`,
-              `name_on_disc.ilike.${likeTerm}`,
-              `plastic_type.ilike.${likeTerm}`,
-              ...nonTextOrClauses(term),
-              `owner_email.ilike.${likeTerm}`
-            ].join(',')
-          )
-          .order('created_at', { ascending: false })
-          .range(offset, offset + limit - 1);
+        const textOrFilter = [
+          `brand.ilike.${likeTerm}`,
+          `mold.ilike.${likeTerm}`,
+          `color.ilike.${likeTerm}`,
+          `location_found.ilike.${likeTerm}`,
+          `description.ilike.${likeTerm}`,
+          `stamp_text.ilike.${likeTerm}`,
+          `phone_number.ilike.${likeTerm}`,
+          `name_on_disc.ilike.${likeTerm}`,
+          `plastic_type.ilike.${likeTerm}`,
+          ...nonTextOrClauses(term),
+          `owner_email.ilike.${likeTerm}`
+        ].join(',');
+        const { column: orderColumn, ascending } = orderForSort(sortBy);
+
+        // Fetch every OR match up to the end of the requested page (in final sort order), so the
+        // rack/phone matches can be merged in and the page sliced client-side
+        const orQuery = (table: 'public_found_discs' | 'found_discs') => {
+          let query = supabase.from(table).select('*', { count: 'exact' }).or(textOrFilter);
+          if (table === 'found_discs') query = query.eq('status', 'active');
+          if (!includeForSaleUsed) query = query.or(NOT_FOR_SALE_USED_FILTER);
+          return query.order(orderColumn, { ascending }).range(0, offset + limit - 1);
+        };
+
+        let { data: orData, error: orError, count: orCount } = await orQuery('public_found_discs');
 
         // If public view OR search fails, try main table with status filter
         if (orError) {
-          let mainQuery = supabase
-            .from('found_discs')
-            .select('*')
-            .eq('status', 'active')
-            .order('created_at', { ascending: false })
-            .range(offset, offset + limit - 1);
-
-          // Apply OR across text fields on main table
-          mainQuery = mainQuery.or(
-            [
-              `brand.ilike.${likeTerm}`,
-              `mold.ilike.${likeTerm}`,
-              `color.ilike.${likeTerm}`,
-              `location_found.ilike.${likeTerm}`,
-              `description.ilike.${likeTerm}`,
-              `stamp_text.ilike.${likeTerm}`,
-              `phone_number.ilike.${likeTerm}`,
-              `name_on_disc.ilike.${likeTerm}`,
-              `plastic_type.ilike.${likeTerm}`,
-              ...nonTextOrClauses(term),
-              `owner_email.ilike.${likeTerm}`
-            ].join(',')
-          );
-
-          const res = await mainQuery;
+          const res = await orQuery('found_discs');
           orData = res.data as any[] | null;
           orError = res.error;
+          orCount = res.count;
         }
 
         if (!orError && orData) {
-          // Merge rack_id results (if any) with OR results (phone/email/etc.) and de-duplicate
-          const seen = new Set<string>();
-          const combined = [
-            ...(Array.isArray(rackIdResults) ? rackIdResults : []),
-            ...excludeForSaleUsed(orData, includeForSaleUsed)
-          ].filter(d => (seen.has(d.id) ? false : (seen.add(d.id), true)));
+          // Merge rack_id/phone results (if any) with OR results and de-duplicate
+          const orIds = new Set(orData.map((d: any) => d.id));
+          const extras = (Array.isArray(rackIdResults) ? rackIdResults : []).filter(d => !orIds.has(d.id));
+          const combined = [...extras, ...orData];
 
-          // Sort and paginate combined results
-          let sorted = this.sortFoundDiscs(combined as any, sortBy);
+          const sorted = this.sortFoundDiscs(combined as any, sortBy);
           const paged = sorted.slice(offset, offset + limit);
+          const total = (orCount ?? orData.length) + extras.length;
 
           return {
             data: paged,
             error: null,
-            count: combined.length,
-            hasMore: offset + limit < combined.length,
+            count: total,
+            hasMore: offset + limit < total,
             nextOffset: offset + limit
           };
         }
