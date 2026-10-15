@@ -172,6 +172,35 @@ export interface DiscMatch {
 }
 
 // Helper functions for database operations
+// 'For Sale Used' discs are hidden from lists/search unless explicitly requested (admin filter)
+const FOR_SALE_USED: ReturnStatus = 'For Sale Used';
+// NULL return_status counts as 'Found', so a plain neq (which drops NULLs) isn't enough
+const NOT_FOR_SALE_USED_FILTER = `return_status.is.null,return_status.neq."${FOR_SALE_USED}"`;
+
+// OR-search clauses for non-text columns, which can't use ilike (it errors, and used to knock
+// every search into the slow fallback). disc_type is an enum: match the values containing the
+// term. owner_pdga_number is an integer: match exactly when the term is a number.
+const DISC_TYPES = ['driver', 'fairway_driver', 'midrange', 'putter', 'approach', 'distance_driver', 'not specified'];
+
+function nonTextOrClauses(term: string): string[] {
+  const clauses: string[] = [];
+  const lower = term.toLowerCase();
+  const discTypes = DISC_TYPES.filter(t => t.includes(lower));
+  if (discTypes.length) clauses.push(`disc_type.in.(${discTypes.map(t => `"${t}"`).join(',')})`);
+  if (/^\d{1,9}$/.test(term)) clauses.push(`owner_pdga_number.eq.${term}`);
+  return clauses;
+}
+
+// Digits for rack ID / phone substring matching, only when the term is itself a number
+// (otherwise 'md3' would match every disc with a 3 in its rack ID or phone)
+function numericSearchDigits(term: string): string {
+  return /^[\d\s#()+.-]+$/.test(term) ? term.replace(/[^0-9]/g, '') : '';
+}
+
+function excludeForSaleUsed<T extends { return_status?: ReturnStatus | null }>(discs: T[], includeForSaleUsed: boolean): T[] {
+  return includeForSaleUsed ? discs : discs.filter(d => d.return_status !== FOR_SALE_USED);
+}
+
 export const discService = {
   // Ensure demo user exists
   async ensureDemoUser() {
@@ -277,9 +306,21 @@ export const discService = {
     limit?: number;
     offset?: number;
     fetchAll?: boolean;
+    includeForSaleUsed?: boolean;
   } = {}) {
     try {
-      const { limit = 500, offset = 0, fetchAll = false } = options;
+      const { limit = 500, offset = 0, fetchAll = false, includeForSaleUsed = false } = options;
+
+      const rangeQuery = (count?: 'exact') => {
+        let query = supabase
+          .from('found_discs')
+          .select('*', count ? { count } : undefined)
+          .eq('status', 'active')
+          .gte('rack_id', min)
+          .lte('rack_id', max);
+        if (!includeForSaleUsed) query = query.or(NOT_FOR_SALE_USED_FILTER);
+        return query.order('rack_id', { ascending: true });
+      };
 
       if (fetchAll) {
         // Fetch all in range using chunking
@@ -289,13 +330,7 @@ export const discService = {
         let hasMore = true;
 
         while (hasMore) {
-          const { data, error } = await supabase
-            .from('found_discs')
-            .select('*')
-            .eq('status', 'active')
-            .gte('rack_id', min)
-            .lte('rack_id', max)
-            .order('rack_id', { ascending: true })
+          const { data, error } = await rangeQuery()
             .range(chunkOffset, chunkOffset + chunkSize - 1);
 
           if (error) throw error;
@@ -310,13 +345,7 @@ export const discService = {
 
         return { data: allDiscs, error: null, count: allDiscs.length, hasMore: false, nextOffset: 0 };
       } else {
-        const { data, error, count } = await supabase
-          .from('found_discs')
-          .select('*', { count: 'exact' })
-          .eq('status', 'active')
-          .gte('rack_id', min)
-          .lte('rack_id', max)
-          .order('rack_id', { ascending: true })
+        const { data, error, count } = await rangeQuery('exact')
           .range(offset, offset + limit - 1);
 
         if (error) throw error;
@@ -336,13 +365,14 @@ export const discService = {
     sortBy?: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc';
     minRackId?: number;
     maxRackId?: number;
+    includeForSaleUsed?: boolean;
   } = {}) {
     try {
-      const { limit = 1000, offset = 0, fetchAll = true, sortBy = 'newest', minRackId, maxRackId } = options;
+      const { limit = 1000, offset = 0, fetchAll = true, sortBy = 'newest', minRackId, maxRackId, includeForSaleUsed = false } = options;
 
       if (fetchAll) {
         // Fetch all records using chunking
-        const result = await this.getAllFoundDiscsChunked();
+        const result = await this.getAllFoundDiscsChunked(includeForSaleUsed);
         if (result.data) {
           // Apply client-side filtering and sorting
           let filteredData = result.data;
@@ -367,7 +397,7 @@ export const discService = {
         return result;
       } else {
         // Fetch specific page
-        return await this.getFoundDiscsPage(limit, offset, sortBy, minRackId, maxRackId);
+        return await this.getFoundDiscsPage(limit, offset, sortBy, minRackId, maxRackId, includeForSaleUsed);
       }
     } catch (error) {
       console.error('Error fetching found discs:', error)
@@ -393,7 +423,7 @@ export const discService = {
   },
 
   // Get a specific page of found discs
-  async getFoundDiscsPage(limit: number = 50, offset: number = 0, sortBy: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc' = 'newest', minRackId?: number, maxRackId?: number) {
+  async getFoundDiscsPage(limit: number = 50, offset: number = 0, sortBy: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc' = 'newest', minRackId?: number, maxRackId?: number, includeForSaleUsed: boolean = false) {
     try {
       // Determine sort order
       let orderColumn = 'created_at';
@@ -431,6 +461,9 @@ export const discService = {
       if (maxRackId !== undefined) {
         query = query.lte('rack_id', maxRackId);
       }
+      if (!includeForSaleUsed) {
+        query = query.or(NOT_FOR_SALE_USED_FILTER);
+      }
 
       let { data, error, count } = await query
         .order(orderColumn, { ascending })
@@ -450,6 +483,9 @@ export const discService = {
         }
         if (maxRackId !== undefined) {
           mainQuery = mainQuery.lte('rack_id', maxRackId);
+        }
+        if (!includeForSaleUsed) {
+          mainQuery = mainQuery.or(NOT_FOR_SALE_USED_FILTER);
         }
 
         const result = await mainQuery
@@ -476,7 +512,7 @@ export const discService = {
   },
 
   // Get all found discs using chunked fetching to bypass 1000 record limit
-  async getAllFoundDiscsChunked() {
+  async getAllFoundDiscsChunked(includeForSaleUsed: boolean = false) {
     try {
       const allDiscs: FoundDisc[] = [];
       let offset = 0;
@@ -489,19 +525,23 @@ export const discService = {
         console.log(`Fetching chunk at offset ${offset}...`);
 
         // Try the public view first, fallback to main table
-        let { data, error } = await supabase
+        let viewQuery = supabase
           .from('public_found_discs')
-          .select('*')
+          .select('*');
+        if (!includeForSaleUsed) viewQuery = viewQuery.or(NOT_FOR_SALE_USED_FILTER);
+        let { data, error } = await viewQuery
           .order('created_at', { ascending: false })
           .range(offset, offset + chunkSize - 1)
 
         // If public view doesn't exist or doesn't have image_urls, use main table
         if (error || (data && data.length > 0 && !data[0].hasOwnProperty('image_urls'))) {
           if (offset === 0) console.log('Using main table instead of view');
-          const result = await supabase
+          let mainQuery = supabase
             .from('found_discs')
             .select('*')
-            .eq('status', 'active')
+            .eq('status', 'active');
+          if (!includeForSaleUsed) mainQuery = mainQuery.or(NOT_FOR_SALE_USED_FILTER);
+          const result = await mainQuery
             .order('created_at', { ascending: false })
             .range(offset, offset + chunkSize - 1);
 
@@ -717,6 +757,7 @@ export const discService = {
     sortBy?: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc';
     minRackId?: number;
     maxRackId?: number;
+    includeForSaleUsed?: boolean;
   } = {}) {
     try {
       if (!searchQuery || searchQuery.trim() === '') {
@@ -724,7 +765,7 @@ export const discService = {
         return this.getFoundDiscs(options);
       }
 
-      const { limit = 1000, offset = 0, fetchAll = true, sortBy = 'newest', minRackId, maxRackId } = options;
+      const { limit = 1000, offset = 0, fetchAll = true, sortBy = 'newest', minRackId, maxRackId, includeForSaleUsed = false } = options;
 
       // For simple single-term searches, use server-side filtering for better performance
       const searchTerms = searchQuery.trim().toLowerCase().split(/\s+/);
@@ -735,7 +776,7 @@ export const discService = {
       } else {
         // Multi-term search - still need client-side filtering for complex logic
         if (fetchAll) {
-          const result = await this.searchFoundDiscsMultiTermChunked(searchTerms);
+          const result = await this.searchFoundDiscsMultiTermChunked(searchTerms, includeForSaleUsed);
           if (result.data) {
             // Apply client-side filtering and sorting
             let filteredData = result.data;
@@ -759,7 +800,7 @@ export const discService = {
           }
           return result;
         } else {
-          return await this.searchFoundDiscsMultiTermPaginated(searchTerms, limit, offset, sortBy, minRackId, maxRackId);
+          return await this.searchFoundDiscsMultiTermPaginated(searchTerms, limit, offset, sortBy, minRackId, maxRackId, includeForSaleUsed);
         }
       }
     } catch (error) {
@@ -776,13 +817,14 @@ export const discService = {
     sortBy?: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc';
     minRackId?: number;
     maxRackId?: number;
+    includeForSaleUsed?: boolean;
   } = {}) {
     try {
-      const { limit = 1000, offset = 0, fetchAll = true, sortBy = 'newest', minRackId, maxRackId } = options;
+      const { limit = 1000, offset = 0, fetchAll = true, sortBy = 'newest', minRackId, maxRackId, includeForSaleUsed = false } = options;
 
       if (fetchAll) {
         // Fetch all matching records using chunking
-        const result = await this.searchFoundDiscsSingleTermChunked(term);
+        const result = await this.searchFoundDiscsSingleTermChunked(term, includeForSaleUsed);
         if (result.data) {
           // Apply client-side filtering and sorting
           let filteredData = result.data;
@@ -807,7 +849,7 @@ export const discService = {
         return result;
       } else {
         // Fetch specific page
-        return await this.searchFoundDiscsSingleTermPage(term, limit, offset, sortBy, minRackId, maxRackId);
+        return await this.searchFoundDiscsSingleTermPage(term, limit, offset, sortBy, minRackId, maxRackId, includeForSaleUsed);
       }
     } catch (error) {
       console.error('Error in single term search:', error);
@@ -816,7 +858,7 @@ export const discService = {
   },
 
   // Single-term search with pagination - optimized for rack_id searches
-  async searchFoundDiscsSingleTermPage(term: string, limit: number, offset: number, sortBy: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc' = 'newest', minRackId?: number, maxRackId?: number) {
+  async searchFoundDiscsSingleTermPage(term: string, limit: number, offset: number, sortBy: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc' = 'newest', minRackId?: number, maxRackId?: number, includeForSaleUsed: boolean = false) {
     try {
       const lowerTerm = term.toLowerCase();
       // Handle rack ID searches - strip # prefix if present
@@ -908,7 +950,7 @@ export const discService = {
             ...(Array.isArray(rackIdResults) ? rackIdResults : []),
             ...(Array.isArray(phoneResults) ? phoneResults : [])
           ].filter(d => (seen.has(d.id) ? false : (seen.add(d.id), true)));
-          rackIdResults = combined; // reuse for later merging with OR
+          rackIdResults = excludeForSaleUsed(combined, includeForSaleUsed); // reuse for later merging with OR
         }
       }
 
@@ -930,6 +972,7 @@ export const discService = {
           idError = result.error;
         }
 
+        if (idResults) idResults = excludeForSaleUsed(idResults, includeForSaleUsed);
         if (!idError && idResults && idResults.length > 0) {
           return {
             data: idResults,
@@ -959,7 +1002,7 @@ export const discService = {
               `phone_number.ilike.${likeTerm}`,
               `name_on_disc.ilike.${likeTerm}`,
               `plastic_type.ilike.${likeTerm}`,
-              `disc_type.ilike.${likeTerm}`,
+              ...nonTextOrClauses(term),
               `owner_email.ilike.${likeTerm}`
             ].join(',')
           )
@@ -987,7 +1030,7 @@ export const discService = {
               `phone_number.ilike.${likeTerm}`,
               `name_on_disc.ilike.${likeTerm}`,
               `plastic_type.ilike.${likeTerm}`,
-              `disc_type.ilike.${likeTerm}`,
+              ...nonTextOrClauses(term),
               `owner_email.ilike.${likeTerm}`
             ].join(',')
           );
@@ -1002,7 +1045,7 @@ export const discService = {
           const seen = new Set<string>();
           const combined = [
             ...(Array.isArray(rackIdResults) ? rackIdResults : []),
-            ...orData
+            ...excludeForSaleUsed(orData, includeForSaleUsed)
           ].filter(d => (seen.has(d.id) ? false : (seen.add(d.id), true)));
 
           // Sort and paginate combined results
@@ -1026,7 +1069,7 @@ export const discService = {
       console.log(`Performing full search for term: "${term}"`);
 
       // Get all discs and filter client-side for comprehensive search
-      const { data: allDiscs, error: fetchError } = await this.getAllFoundDiscsChunked();
+      const { data: allDiscs, error: fetchError } = await this.getAllFoundDiscsChunked(includeForSaleUsed);
 
       if (fetchError) {
         throw fetchError;
@@ -1060,7 +1103,7 @@ export const discService = {
         const matchesRackId = isNumericSearch && disc.rack_id === rackIdNum;
 
         // Numeric substring match on rack_id
-        const termDigits = term.replace(/[^0-9]/g, '');
+        const termDigits = numericSearchDigits(term);
         const rackDigits = (disc.rack_id !== undefined && disc.rack_id !== null) ? String(disc.rack_id) : '';
         const matchesRackDigits = termDigits ? rackDigits.includes(termDigits) : false;
 
@@ -1100,7 +1143,7 @@ export const discService = {
   },
 
   // Single-term search using chunked fetching - optimized for rack_id searches
-  async searchFoundDiscsSingleTermChunked(term: string) {
+  async searchFoundDiscsSingleTermChunked(term: string, includeForSaleUsed: boolean = false) {
     try {
       const lowerTerm = term.toLowerCase();
       // Handle rack ID searches - strip # prefix if present
@@ -1192,7 +1235,7 @@ export const discService = {
             ...(Array.isArray(rackIdResults) ? rackIdResults : []),
             ...(Array.isArray(phoneResults) ? phoneResults : [])
           ].filter(d => (seen.has(d.id) ? false : (seen.add(d.id), true)));
-          rackIdResults = combined; // reuse for later merging with filtered list
+          rackIdResults = excludeForSaleUsed(combined, includeForSaleUsed); // reuse for later merging with filtered list
         }
       }
 
@@ -1214,6 +1257,7 @@ export const discService = {
           idError = result.error;
         }
 
+        if (idResults) idResults = excludeForSaleUsed(idResults, includeForSaleUsed);
         if (!idError && idResults && idResults.length > 0) {
           return {
             data: idResults,
@@ -1241,7 +1285,7 @@ export const discService = {
             `phone_number.ilike.${likeTerm}`,
             `name_on_disc.ilike.${likeTerm}`,
             `plastic_type.ilike.${likeTerm}`,
-            `disc_type.ilike.${likeTerm}`,
+            ...nonTextOrClauses(term),
             `owner_email.ilike.${likeTerm}`
           ].join(','))
           .order('created_at', { ascending: false });
@@ -1263,7 +1307,7 @@ export const discService = {
             `phone_number.ilike.${likeTerm}`,
             `name_on_disc.ilike.${likeTerm}`,
             `plastic_type.ilike.${likeTerm}`,
-            `disc_type.ilike.${likeTerm}`,
+            ...nonTextOrClauses(term),
             `owner_email.ilike.${likeTerm}`
           ].join(','));
 
@@ -1276,7 +1320,7 @@ export const discService = {
           const seen = new Set<string>();
           const combined = [
             ...(Array.isArray(rackIdResults) ? rackIdResults : []),
-            ...orData
+            ...excludeForSaleUsed(orData, includeForSaleUsed)
           ].filter(d => (seen.has(d.id) ? false : (seen.add(d.id), true)));
 
           const sorted = this.sortFoundDiscs(combined as any, 'newest');
@@ -1290,7 +1334,7 @@ export const discService = {
       console.log(`Performing full chunked search for term: "${term}"`);
 
       // Get all discs first, then filter in JavaScript for reliable search
-      const { data: allDiscs, error: fetchError } = await this.getAllFoundDiscsChunked();
+      const { data: allDiscs, error: fetchError } = await this.getAllFoundDiscsChunked(includeForSaleUsed);
 
       if (fetchError) {
         throw fetchError;
@@ -1328,7 +1372,7 @@ export const discService = {
         const matchesId = uuidRegex.test(term) && disc.id === term;
 
         // Numeric substring match on rack_id and phone ignoring formatting
-        const termDigits = term.replace(/[^0-9]/g, '');
+        const termDigits = numericSearchDigits(term);
         const rackDigits = (disc.rack_id !== undefined && disc.rack_id !== null) ? String(disc.rack_id) : '';
         const matchesRackDigits = termDigits ? rackDigits.includes(termDigits) : false;
         const phoneDigits = (disc.phone_number || '').replace(/[^0-9]/g, '');
@@ -1362,12 +1406,12 @@ export const discService = {
   },
 
   // Multi-term search with pagination (still needs client-side filtering)
-  async searchFoundDiscsMultiTermPaginated(searchTerms: string[], limit: number, offset: number, sortBy: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc' = 'newest', minRackId?: number, maxRackId?: number) {
+  async searchFoundDiscsMultiTermPaginated(searchTerms: string[], limit: number, offset: number, sortBy: 'newest' | 'oldest' | 'rack_id_asc' | 'rack_id_desc' = 'newest', minRackId?: number, maxRackId?: number, includeForSaleUsed: boolean = false) {
     try {
       // For multi-term searches, we need to get a larger dataset and filter client-side
       // Get more records than requested to account for filtering
       const fetchLimit = Math.max(limit * 3, 1000); // Get 3x more records to account for filtering
-      const { data: allDiscs, error: fetchError } = await this.getFoundDiscsPage(fetchLimit, 0, sortBy, minRackId, maxRackId);
+      const { data: allDiscs, error: fetchError } = await this.getFoundDiscsPage(fetchLimit, 0, sortBy, minRackId, maxRackId, includeForSaleUsed);
 
       if (fetchError) {
         throw fetchError;
@@ -1407,7 +1451,7 @@ export const discService = {
           const matchesRackId = !isNaN(rackIdNum) && disc.rack_id === rackIdNum;
 
           // Numeric substring match on rack_id and phone ignoring formatting
-          const termDigits = term.replace(/[^0-9]/g, '');
+          const termDigits = numericSearchDigits(term);
           const rackDigits = (disc.rack_id !== undefined && disc.rack_id !== null) ? String(disc.rack_id) : '';
           const matchesRackDigits = termDigits ? rackDigits.includes(termDigits) : false;
           const phoneDigits = (disc.phone_number || '').replace(/[^0-9]/g, '');
@@ -1449,12 +1493,12 @@ export const discService = {
   },
 
   // Multi-term search using chunked fetching
-  async searchFoundDiscsMultiTermChunked(searchTerms: string[]) {
+  async searchFoundDiscsMultiTermChunked(searchTerms: string[], includeForSaleUsed: boolean = false) {
     try {
       console.log(`Searching for multi-term "${searchTerms.join(' ')}" using chunked approach...`);
 
       // Get all discs first, then filter in JavaScript for complex multi-term search
-      const { data: allDiscs, error: fetchError } = await this.getAllFoundDiscsChunked();
+      const { data: allDiscs, error: fetchError } = await this.getAllFoundDiscsChunked(includeForSaleUsed);
 
       if (fetchError) {
         throw fetchError;
@@ -1494,7 +1538,7 @@ export const discService = {
           const matchesRackId = !isNaN(rackIdNum) && disc.rack_id === rackIdNum;
 
           // Numeric substring match on rack_id and phone ignoring formatting (multi-term chunked)
-          const termDigits = term.replace(/[^0-9]/g, '');
+          const termDigits = numericSearchDigits(term);
           const rackDigits = (disc.rack_id !== undefined && disc.rack_id !== null) ? String(disc.rack_id) : '';
           const matchesRackDigits = termDigits ? rackDigits.includes(termDigits) : false;
           const phoneDigits = (disc.phone_number || '').replace(/[^0-9]/g, '');

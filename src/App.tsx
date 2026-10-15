@@ -57,7 +57,7 @@ function FAQ() {
 
   return (
     <div className="main-container">
-      <div className="max-w-4xl mx-auto">
+      <div>
         <h1 className="text-3xl font-bold text-gray-900 mb-8 text-center">Frequently Asked Questions</h1>
 
         {loading ? (
@@ -155,7 +155,7 @@ function AppContent() {
       )}
 
       <nav className="navbar bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
-        <div className="nav-container max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="nav-container px-4 sm:px-6 lg:px-8">
           <div className="logo text-xl font-bold text-blue-600 cursor-pointer py-2" onClick={() => setCurrentPage('home')}>
             DZDiscFinder
           </div>
@@ -934,6 +934,61 @@ interface HomeProps {
   onNavigate: (page: string, discId?: string) => void;
 }
 
+// Home search state is persisted to sessionStorage so it survives a trip to the disc detail page
+const HOME_SEARCH_KEY = 'dzdf.homeSearch';
+
+interface SavedHomeSearch {
+  query: string;
+  range: { min: number; max: number } | null;
+  page: number;
+  includeReturned: boolean;
+  showAll: boolean;
+  scrollY?: number;
+}
+
+function loadSavedHomeSearch(): SavedHomeSearch | null {
+  try {
+    const raw = sessionStorage.getItem(HOME_SEARCH_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    const range = typeof parsed?.range?.min === 'number' && typeof parsed?.range?.max === 'number'
+      ? { min: parsed.range.min, max: parsed.range.max }
+      : null;
+    const query = typeof parsed?.query === 'string' ? parsed.query : '';
+    if (!range && !query.trim()) return null;
+    return {
+      query,
+      range,
+      page: typeof parsed.page === 'number' && parsed.page > 0 ? parsed.page : 1,
+      includeReturned: !!parsed.includeReturned,
+      showAll: !!parsed.showAll,
+      scrollY: typeof parsed.scrollY === 'number' ? parsed.scrollY : undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+const SHOW_FOR_SALE_USED_KEY = 'dzdf.showForSaleUsed';
+
+function loadShowForSaleUsed(): boolean {
+  try {
+    return sessionStorage.getItem(SHOW_FOR_SALE_USED_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+function saveHomeScrollPosition() {
+  try {
+    const raw = sessionStorage.getItem(HOME_SEARCH_KEY);
+    if (!raw) return;
+    sessionStorage.setItem(HOME_SEARCH_KEY, JSON.stringify({ ...JSON.parse(raw), scrollY: window.scrollY }));
+  } catch {
+    // storage unavailable; scroll just won't be restored
+  }
+}
+
 function Home({ onNavigate }: HomeProps) {
   const { userRole } = useAuth();
   const [recentDiscs, setRecentDiscs] = useState<any[]>([]);
@@ -954,7 +1009,8 @@ function Home({ onNavigate }: HomeProps) {
         limit: RECENT_LIMIT,
         offset: recentNextOffset,
         fetchAll: false,
-        sortBy: 'newest'
+        sortBy: 'newest',
+        includeForSaleUsed
       });
       if (!result.error && result.data) {
         setRecentDiscs(prev => {
@@ -997,21 +1053,27 @@ function Home({ onNavigate }: HomeProps) {
 
 
   const handleNavigateToDetail = (discId: string) => {
+    saveHomeScrollPosition();
     onNavigate('disc-detail', discId);
   };
 
   // Search functionality state
-  const [searchQuery, setSearchQuery] = useState('');
+  const [savedSearch] = useState(loadSavedHomeSearch);
+  const [searchQuery, setSearchQuery] = useState(savedSearch && !savedSearch.range ? savedSearch.query : '');
   const [foundDiscs, setFoundDiscs] = useState<any[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
-  const [hasSearched, setHasSearched] = useState(false);
+  const [isSearching, setIsSearching] = useState(!!savedSearch);
+  const [hasSearched, setHasSearched] = useState(!!savedSearch);
 
   // Pagination state
-  const [currentPage, setCurrentPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(savedSearch?.page ?? 1);
   const [totalCount, setTotalCount] = useState(0);
   const [hasMore, setHasMore] = useState(false);
   const [resultsPerPage, setResultsPerPage] = useState(50);
-  const [showAllResults, setShowAllResults] = useState(false);
+  const [showAllResults, setShowAllResults] = useState(savedSearch?.showAll ?? false);
+
+  // Admin-only filter: 'For Sale Used' discs are hidden unless this is on
+  const [showForSaleUsed, setShowForSaleUsed] = useState(loadShowForSaleUsed);
+  const includeForSaleUsed = userRole === 'admin' && showForSaleUsed;
 
 
 
@@ -1034,9 +1096,10 @@ function Home({ onNavigate }: HomeProps) {
   const [returnSuccessMessage, setReturnSuccessMessage] = useState('');
 
   // Admin rack ID range search
-  const [rackIdRangeInput, setRackIdRangeInput] = useState('');
-  const [activeRackIdRange, setActiveRackIdRange] = useState<{ min: number; max: number } | null>(null);
-  const [showReturnedDiscs, setShowReturnedDiscs] = useState(false);
+  const savedRange = savedSearch?.range ?? null;
+  const [rackIdRangeInput, setRackIdRangeInput] = useState(savedRange ? `${savedRange.min}-${savedRange.max}` : '');
+  const [activeRackIdRange, setActiveRackIdRange] = useState<{ min: number; max: number } | null>(savedRange);
+  const [showReturnedDiscs, setShowReturnedDiscs] = useState(savedSearch?.includeReturned ?? false);
 
   // Track which disc's 3-dot menu is open
   const [openMenuDiscId, setOpenMenuDiscId] = useState<string | null>(null);
@@ -1061,7 +1124,8 @@ function Home({ onNavigate }: HomeProps) {
           limit: RECENT_LIMIT,
           offset: 0,
           fetchAll: false,
-          sortBy: 'newest'
+          sortBy: 'newest',
+          includeForSaleUsed
         });
 
         if (result.error) {
@@ -1088,7 +1152,8 @@ function Home({ onNavigate }: HomeProps) {
     if (!hasSearched) {
       loadRecentDiscs();
     }
-  }, [hasSearched]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasSearched, includeForSaleUsed]);
 
   const handleReturnStatusUpdate = async (discId: string, newStatus: string) => {
     try {
@@ -1142,7 +1207,8 @@ function Home({ onNavigate }: HomeProps) {
               limit: RECENT_LIMIT,
               offset: 0,
               fetchAll: false,
-              sortBy: 'newest'
+              sortBy: 'newest',
+              includeForSaleUsed
             });
 
             if (result.error) {
@@ -1201,8 +1267,8 @@ function Home({ onNavigate }: HomeProps) {
     try {
       const offset = (page - 1) * resultsPerPage;
       const options = showAllResults
-        ? { fetchAll: true }
-        : { limit: resultsPerPage, offset, fetchAll: false };
+        ? { fetchAll: true, includeForSaleUsed }
+        : { limit: resultsPerPage, offset, fetchAll: false, includeForSaleUsed };
 
       const searchOptions = options;
 
@@ -1259,6 +1325,7 @@ function Home({ onNavigate }: HomeProps) {
   const handleSearchInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const query = e.target.value;
     setSearchQuery(query);
+    setActiveRackIdRange(null);
     debouncedSearch(query);
   };
 
@@ -1294,11 +1361,12 @@ function Home({ onNavigate }: HomeProps) {
           fetchAll: showAllResults,
           limit: resultsPerPage,
           offset,
+          includeForSaleUsed,
         });
       } else {
         const options = showAllResults
-          ? { fetchAll: true, minRackId: min, maxRackId: max, sortBy: 'rack_id_asc' as const }
-          : { limit: resultsPerPage, offset, fetchAll: false, minRackId: min, maxRackId: max, sortBy: 'rack_id_asc' as const };
+          ? { fetchAll: true, minRackId: min, maxRackId: max, sortBy: 'rack_id_asc' as const, includeForSaleUsed }
+          : { limit: resultsPerPage, offset, fetchAll: false, minRackId: min, maxRackId: max, sortBy: 'rack_id_asc' as const, includeForSaleUsed };
         result = await discService.searchFoundDiscsWithQuery('', options);
       }
 
@@ -1354,6 +1422,68 @@ function Home({ onNavigate }: HomeProps) {
       performSearch(searchQuery.trim(), 1);
     }
   };
+
+  // Re-run a saved search when returning to Home
+  useEffect(() => {
+    if (!savedSearch) return;
+    if (savedSearch.range) {
+      performRangeSearch(savedSearch.range.min, savedSearch.range.max, savedSearch.page, savedSearch.includeReturned);
+    } else {
+      performSearch(savedSearch.query.trim(), savedSearch.page);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Restore scroll position once the restored results have rendered
+  const pendingScrollYRef = useRef(savedSearch?.scrollY);
+  useEffect(() => {
+    if (isSearching || pendingScrollYRef.current === undefined) return;
+    const y = pendingScrollYRef.current;
+    pendingScrollYRef.current = undefined;
+    requestAnimationFrame(() => window.scrollTo(0, y));
+  }, [isSearching, foundDiscs]);
+
+  // Re-run the current search when the 'For Sale Used' filter changes
+  const prevIncludeForSaleUsedRef = useRef(includeForSaleUsed);
+  useEffect(() => {
+    if (prevIncludeForSaleUsedRef.current === includeForSaleUsed) return;
+    prevIncludeForSaleUsedRef.current = includeForSaleUsed;
+    if (activeRackIdRange) {
+      performRangeSearch(activeRackIdRange.min, activeRackIdRange.max, 1);
+    } else if (searchQuery.trim()) {
+      performSearch(searchQuery.trim(), 1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [includeForSaleUsed]);
+
+  // Persist the admin 'For Sale Used' filter
+  useEffect(() => {
+    try {
+      sessionStorage.setItem(SHOW_FOR_SALE_USED_KEY, showForSaleUsed ? '1' : '0');
+    } catch {
+      // storage unavailable; filter just won't persist
+    }
+  }, [showForSaleUsed]);
+
+  // Persist the active search
+  useEffect(() => {
+    try {
+      if (activeRackIdRange || searchQuery.trim()) {
+        const saved: SavedHomeSearch = {
+          query: activeRackIdRange ? '' : searchQuery,
+          range: activeRackIdRange,
+          page: currentPage,
+          includeReturned: showReturnedDiscs,
+          showAll: showAllResults,
+        };
+        sessionStorage.setItem(HOME_SEARCH_KEY, JSON.stringify(saved));
+      } else {
+        sessionStorage.removeItem(HOME_SEARCH_KEY);
+      }
+    } catch {
+      // storage unavailable; search just won't persist
+    }
+  }, [activeRackIdRange, searchQuery, currentPage, showReturnedDiscs, showAllResults]);
 
   // Cleanup debounce timer on unmount
   useEffect(() => {
@@ -1429,6 +1559,14 @@ function Home({ onNavigate }: HomeProps) {
                   }}
                 />
                 Include returned discs
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '0.85rem', color: '#6b7280', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                <input
+                  type="checkbox"
+                  checked={showForSaleUsed}
+                  onChange={(e) => setShowForSaleUsed(e.target.checked)}
+                />
+                Show 'For Sale Used'
               </label>
               {activeRackIdRange && (
                 <button onClick={clearSearch} className="secondary-button" style={{ padding: '6px 14px', fontSize: '0.85rem' }}>

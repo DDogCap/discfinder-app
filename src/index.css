@@ -31,7 +31,7 @@
   }
 
   .nav-container {
-    @apply max-w-screen-xl mx-auto px-4 flex justify-between items-center;
+    @apply px-4 flex justify-between items-center;
   }
 
   .logo {
@@ -52,7 +52,7 @@
 
   /* Main Layout */
   .main-container {
-    @apply max-w-screen-xl mx-auto px-4 py-2;
+    @apply px-4 py-2;
   }
 
   /* Hero Section */
@@ -114,7 +114,7 @@
 
   /* Recent Discs Section */
   .recent-discs-section {
-    @apply mt-4 max-w-7xl mx-auto;
+    @apply mt-4;
   }
 
   .recent-discs-section h2 {
@@ -394,7 +394,7 @@
 
   /* Search Components */
   .search-container {
-    @apply max-w-6xl mx-auto;
+    @apply w-full;
   }
 
   .search-form {
