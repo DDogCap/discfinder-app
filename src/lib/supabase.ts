@@ -295,6 +295,29 @@ export const discService = {
     }
   },
 
+  // Discs by ID from the public view (contact fields masked for non-admins), in chunks
+  async fetchPublicDiscsByIds(ids: string[]): Promise<FoundDisc[]> {
+    const discs: FoundDisc[] = [];
+    for (let i = 0; i < ids.length; i += 500) {
+      const { data } = await supabase
+        .from('public_found_discs')
+        .select('*')
+        .in('id', ids.slice(i, i + 500));
+      if (data) discs.push(...data);
+    }
+    return discs;
+  },
+
+  // Exact owner email or PDGA number. Those fields are hidden from non-admins in the view, so the
+  // match happens in the database and only IDs come back
+  async findDiscsByOwner(term: string): Promise<FoundDisc[]> {
+    const trimmed = term.trim();
+    if (!trimmed.includes('@') && !/^\d{1,9}$/.test(trimmed)) return [];
+    const { data, error } = await supabase.rpc('search_disc_ids_by_owner', { p_term: trimmed });
+    if (error || !data || data.length === 0) return [];
+    return this.fetchPublicDiscsByIds((data as { id: string }[]).map(r => r.id));
+  },
+
   // Get all FAQs
   async getFAQs() {
     try {
@@ -777,8 +800,12 @@ export const discService = {
 
       const { limit = 1000, offset = 0, fetchAll = true, sortBy = 'newest', minRackId, maxRackId, includeForSaleUsed = false } = options;
 
-      // For simple single-term searches, use server-side filtering for better performance
-      const searchTerms = searchQuery.trim().toLowerCase().split(/\s+/);
+      // For simple single-term searches, use server-side filtering for better performance.
+      // A phone number typed with spaces, e.g. "(316) 555-1234", is one digits-only term.
+      const phoneDigits = numericSearchDigits(searchQuery.trim());
+      const searchTerms = phoneDigits.length >= 7
+        ? [phoneDigits]
+        : searchQuery.trim().toLowerCase().split(/\s+/);
 
       if (searchTerms.length === 1) {
         // Single term - use server-side search for better performance
@@ -962,6 +989,13 @@ export const discService = {
           ].filter(d => (seen.has(d.id) ? false : (seen.add(d.id), true)));
           rackIdResults = excludeForSaleUsed(combined, includeForSaleUsed); // reuse for later merging with OR
         }
+      }
+
+      // Exact owner email / PDGA matches (masked in the view for non-admins, so matched server-side)
+      const ownerMatches = excludeForSaleUsed(await this.findDiscsByOwner(term), includeForSaleUsed);
+      if (ownerMatches.length > 0) {
+        const known = new Set((rackIdResults || []).map(d => d.id));
+        rackIdResults = [...(rackIdResults || []), ...ownerMatches.filter(d => !known.has(d.id))];
       }
 
       // If not a rack_id hit, try a direct UUID (id) match
@@ -1151,13 +1185,13 @@ export const discService = {
         console.log(`Trying direct rack_id search for: ${rackIdNum}`);
 
         // Try direct rack_id search first
-        let { data: rackIdResults, error: rackIdError } = await supabase
+        let { data: rackIdData, error: rackIdError } = await supabase
           .from('public_found_discs')
           .select('*')
           .eq('rack_id', rackIdNum);
 
         // If public view doesn't work, try main table
-        if (rackIdError || !rackIdResults) {
+        if (rackIdError || !rackIdData) {
           console.log('Trying main table for rack_id search');
           const result = await supabase
             .from('found_discs')
@@ -1165,13 +1199,14 @@ export const discService = {
             .eq('status', 'active')
             .eq('rack_id', rackIdNum);
 
-          rackIdResults = result.data;
+          rackIdData = result.data;
           rackIdError = result.error;
         }
 
         if (rackIdError) {
           console.error('Rack ID search error:', rackIdError);
         }
+        rackIdResults = rackIdData || [];
 
         // Also search for phone matches via RPC that returns only IDs (guest-safe)
         // Page through the phone RPC to bypass 1k row cap
@@ -1226,6 +1261,13 @@ export const discService = {
           ].filter(d => (seen.has(d.id) ? false : (seen.add(d.id), true)));
           rackIdResults = excludeForSaleUsed(combined, includeForSaleUsed); // reuse for later merging with filtered list
         }
+      }
+
+      // Exact owner email / PDGA matches (masked in the view for non-admins, so matched server-side)
+      const ownerMatches = excludeForSaleUsed(await this.findDiscsByOwner(term), includeForSaleUsed);
+      if (ownerMatches.length > 0) {
+        const known = new Set((rackIdResults || []).map(d => d.id));
+        rackIdResults = [...(rackIdResults || []), ...ownerMatches.filter(d => !known.has(d.id))];
       }
 
       // If not a rack_id hit, try a direct UUID (id) match for chunked search
