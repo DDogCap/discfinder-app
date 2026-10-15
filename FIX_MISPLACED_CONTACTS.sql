@@ -28,3 +28,17 @@ WHERE rack_id = 4939 AND name_on_disc = '6207575134' AND phone_number = '+162075
 
 UPDATE found_discs SET name_on_disc = NULL, updated_at = now()
 WHERE rack_id = 5279 AND name_on_disc = '6025014255' AND phone_number = '+16025014255';
+
+-- Follow-up (confirmed by Galen): UK mobile in stamp -> phone_number
+UPDATE found_discs SET phone_number = '+447471902063', stamp_text = NULL, updated_at = now()
+WHERE rack_id = 3016 AND stamp_text = '07471902063' AND phone_number IS NULL;
+
+-- Name had been entered into description (fields shifted by one)
+UPDATE found_discs SET name_on_disc = description, description = NULL, updated_at = now()
+WHERE rack_id = 4894 AND description = 'Todd' AND name_on_disc IS NULL;
+
+UPDATE found_discs SET name_on_disc = description, description = NULL, updated_at = now()
+WHERE rack_id = 4939 AND description = 'Derek paige' AND name_on_disc IS NULL;
+
+UPDATE found_discs SET name_on_disc = description, description = NULL, updated_at = now()
+WHERE rack_id = 6268 AND description = 'Grant' AND name_on_disc IS NULL;
