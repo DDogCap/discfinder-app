@@ -598,6 +598,19 @@
     @apply w-full aspect-square object-cover rounded-lg border border-gray-200 shadow-sm;
   }
 
+  /* Admin edit: photos beside the form on wide screens, above it on phones */
+  .disc-edit-layout {
+    @apply grid grid-cols-1 lg:grid-cols-2 gap-8 items-start;
+  }
+
+  .disc-edit-layout > * {
+    @apply min-w-0;
+  }
+
+  .disc-edit-images {
+    @apply lg:sticky lg:top-20;
+  }
+
   .disc-detail-info {
     @apply bg-white rounded-lg border border-gray-200 p-6 shadow-sm;
   }

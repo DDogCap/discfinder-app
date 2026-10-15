@@ -161,79 +161,92 @@ export function DiscEditForm({ discId, onSaved, onCancel }: DiscEditFormProps) {
     return [{ value: '', label: '—' }, ...all.map(v => ({ value: v, label: v.replace(/_/g, ' ') }))];
   };
 
+  const imageUrls = original.image_urls || [];
+
   return (
-    <form className="disc-form" onSubmit={handleSubmit}>
-      <div className="form-section">
-        <h3>Disc</h3>
-        <div className="form-row">
-          {textField('rack_id', 'Rack ID')}
-          {textField('brand', 'Brand *')}
+    <div className="disc-edit-layout">
+      {imageUrls.length > 0 && (
+        <div className="disc-edit-images">
+          <div className="disc-detail-images">
+            {imageUrls.map((url, index) => (
+              <img key={url} src={url} alt={`${original.brand} ${original.mold || 'disc'} ${index + 1}`} className="disc-detail-image" />
+            ))}
+          </div>
         </div>
-        <div className="form-row">
-          {textField('mold', 'Mold')}
-          {selectField('disc_type', 'Disc type', enumOptions(DISC_TYPE_OPTIONS, form.disc_type))}
+      )}
+      <form className="disc-form" onSubmit={handleSubmit}>
+        <div className="form-section">
+          <h3>Disc</h3>
+          <div className="form-row">
+            {textField('rack_id', 'Rack ID')}
+            {textField('brand', 'Brand *')}
+          </div>
+          <div className="form-row">
+            {textField('mold', 'Mold')}
+            {selectField('disc_type', 'Disc type', enumOptions(DISC_TYPE_OPTIONS, form.disc_type))}
+          </div>
+          <div className="form-row">
+            {textField('color', 'Color')}
+            {textField('weight', 'Weight (g)')}
+          </div>
+          <div className="form-row">
+            {selectField('condition', 'Condition', enumOptions(CONDITION_OPTIONS, form.condition))}
+            {textField('plastic_type', 'Plastic')}
+          </div>
+          <div className="form-row">
+            {textField('stamp_text', 'Stamp')}
+          </div>
         </div>
-        <div className="form-row">
-          {textField('color', 'Color')}
-          {textField('weight', 'Weight (g)')}
+  
+        <div className="form-section">
+          <h3>Owner</h3>
+          <div className="form-row">
+            {textField('name_on_disc', 'Name on disc')}
+            {textField('phone_number', 'Phone on disc', 'tel')}
+          </div>
+          <div className="form-row">
+            {textField('owner_email', 'Owner email', 'email')}
+            {textField('owner_pdga_number', 'Owner PDGA #')}
+          </div>
         </div>
-        <div className="form-row">
-          {selectField('condition', 'Condition', enumOptions(CONDITION_OPTIONS, form.condition))}
-          {textField('plastic_type', 'Plastic')}
+  
+        <div className="form-section">
+          <h3>Where & when</h3>
+          <div className="form-row">
+            {selectField('source_id', 'Source', [
+              { value: '', label: '—' },
+              ...sourceOptions.map(s => ({ value: s.id, label: s.name })),
+            ])}
+            {textField('found_date', 'Found on *', 'date')}
+          </div>
+          <div className="form-row">
+            {textField('location_found', 'Specific location')}
+          </div>
+          <div className="form-group">
+            <label htmlFor="edit-description">Description</label>
+            <textarea id="edit-description" value={form.description} onChange={set('description')} />
+          </div>
         </div>
-        <div className="form-row">
-          {textField('stamp_text', 'Stamp')}
+  
+        <div className="form-section">
+          <h3>Status</h3>
+          <div className="form-row">
+            {selectField('return_status', 'Return status', RETURN_STATUS_OPTIONS.map(s => ({ value: s, label: s })))}
+            {textField('returned_notes', 'Status notes')}
+          </div>
         </div>
-      </div>
-
-      <div className="form-section">
-        <h3>Owner</h3>
-        <div className="form-row">
-          {textField('name_on_disc', 'Name on disc')}
-          {textField('phone_number', 'Phone on disc', 'tel')}
+  
+        {saveError && <div className="status-message error">{saveError}</div>}
+  
+        <div className="form-actions">
+          <button type="button" className="button secondary" onClick={onCancel} disabled={isSaving}>
+            Cancel
+          </button>
+          <button type="submit" className="button primary" disabled={isSaving}>
+            {isSaving ? 'Saving…' : 'Save changes'}
+          </button>
         </div>
-        <div className="form-row">
-          {textField('owner_email', 'Owner email', 'email')}
-          {textField('owner_pdga_number', 'Owner PDGA #')}
-        </div>
-      </div>
-
-      <div className="form-section">
-        <h3>Where & when</h3>
-        <div className="form-row">
-          {selectField('source_id', 'Source', [
-            { value: '', label: '—' },
-            ...sourceOptions.map(s => ({ value: s.id, label: s.name })),
-          ])}
-          {textField('found_date', 'Found on *', 'date')}
-        </div>
-        <div className="form-row">
-          {textField('location_found', 'Specific location')}
-        </div>
-        <div className="form-group">
-          <label htmlFor="edit-description">Description</label>
-          <textarea id="edit-description" value={form.description} onChange={set('description')} />
-        </div>
-      </div>
-
-      <div className="form-section">
-        <h3>Status</h3>
-        <div className="form-row">
-          {selectField('return_status', 'Return status', RETURN_STATUS_OPTIONS.map(s => ({ value: s, label: s })))}
-          {textField('returned_notes', 'Status notes')}
-        </div>
-      </div>
-
-      {saveError && <div className="status-message error">{saveError}</div>}
-
-      <div className="form-actions">
-        <button type="button" className="button secondary" onClick={onCancel} disabled={isSaving}>
-          Cancel
-        </button>
-        <button type="submit" className="button primary" disabled={isSaving}>
-          {isSaving ? 'Saving…' : 'Save changes'}
-        </button>
-      </div>
-    </form>
+      </form>
+    </div>
   );
 }
