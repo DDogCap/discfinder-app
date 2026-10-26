@@ -10,14 +10,45 @@ module.exports = async function handler(req, res) {
   }
 
   try {
+    // Require a signed-in, non-guest user; fail closed if Supabase isn't configured
+    const SUPABASE_URL = process.env.REACT_APP_SUPABASE_URL;
+    const SUPABASE_ANON_KEY = process.env.REACT_APP_SUPABASE_ANON_KEY;
+    const token = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !token) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+
+    const userResp = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` }
+    });
+    if (!userResp.ok) {
+      return res.status(401).json({ success: false, error: 'Unauthorized' });
+    }
+    const user = await userResp.json();
+
+    const profileResp = await fetch(
+      `${SUPABASE_URL}/rest/v1/profiles?id=eq.${encodeURIComponent(user.id)}&select=role`,
+      { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${token}` } }
+    );
+    const profiles = profileResp.ok ? await profileResp.json() : [];
+    const role = profiles[0] && profiles[0].role;
+    if (!role || role === 'guest') {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+
     const { phoneNumber, message } = req.body;
 
     // Validate input
     if (!phoneNumber || !message) {
-      return res.status(400).json({ 
-        success: false, 
-        error: 'Phone number and message are required' 
+      return res.status(400).json({
+        success: false,
+        error: 'Phone number and message are required'
       });
+    }
+
+    // US numbers only (matches validatePhoneForSMS on the client), bounded length
+    if (!/^\+?1\d{10}$/.test(String(phoneNumber)) || String(message).length > 480) {
+      return res.status(400).json({ success: false, error: 'Invalid phone number or message' });
     }
 
     // Get TextMagic credentials from environment variables (configure in Vercel)

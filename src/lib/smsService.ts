@@ -4,6 +4,7 @@
  */
 
 import { normalizePhoneNumber, validatePhoneNumber } from '../utils/phoneUtils';
+import { supabase } from './supabase';
 
 // TextMagic configuration from environment variables
 const TEXTMAGIC_USERNAME = process.env.REACT_APP_TEXTMAGIC_USERNAME;
@@ -96,11 +97,13 @@ export async function sendSMS(smsMessage: SMSMessage): Promise<SMSResult> {
       message: smsMessage.message
     });
 
-    // Call our API route instead of TextMagic directly
+    // Call our API route instead of TextMagic directly; the route requires the user's session
+    const { data: { session } } = await supabase.auth.getSession();
     const response = await fetch('/api/send-sms', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        Authorization: `Bearer ${session?.access_token ?? ''}`,
       },
       body: JSON.stringify({
         phoneNumber: phoneValidation.normalizedPhone,
